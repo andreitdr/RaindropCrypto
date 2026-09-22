@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/raindrop_crypto", "crates/raindrop_crypto_ffi"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+# Crypto code is slow and hard to profile unoptimised; the tests exercise real key derivations.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = true
+codegen-units = 1

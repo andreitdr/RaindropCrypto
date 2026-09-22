@@ -1,0 +1,19 @@
+[package]
+name = "raindrop_crypto_ffi"
+version = "0.1.0"
+description = "The Flutter binding for raindrop_crypto, generated with flutter_rust_bridge."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+raindrop_crypto = { path = "../raindrop_crypto" }
+# Must match the flutter_rust_bridge version in RaindropClient/pubspec.yaml and the installed
+# flutter_rust_bridge_codegen exactly.
+flutter_rust_bridge = "=2.13.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

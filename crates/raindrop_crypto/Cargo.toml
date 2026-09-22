@@ -1,0 +1,39 @@
+[package]
+name = "raindrop_crypto"
+version = "0.1.0"
+description = "Raindrop's end-to-end encryption core: MLS groups, identity and device keys, key backup, and the encrypted local store."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+openmls = "0.9"
+openmls_rust_crypto = "0.6"
+openmls_basic_credential = "0.6"
+openmls_sqlite_storage = "0.3"
+openmls_traits = "0.6"
+ed25519-dalek = "3"
+chacha20poly1305 = "0.11"
+argon2 = "0.6"
+bip39 = "3"
+getrandom = "0.4"
+zeroize = { version = "1.9", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_bytes = "0.11"
+sha2 = "0.11"
+hkdf = "0.13"
+x25519-dalek = { version = "3", features = ["static_secrets", "zeroize"] }
+thiserror = "2"
+
+# SQLCipher: CommonCrypto on Apple platforms, a vendored OpenSSL everywhere else so Android, Linux
+# and Windows builds need nothing installed. Same rusqlite major as openmls_sqlite_storage, so the
+# feature applies to the one libsqlite3 both use.
+[target.'cfg(target_vendor = "apple")'.dependencies]
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+
+[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[dev-dependencies]
+tempfile = "3"
