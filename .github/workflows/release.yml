@@ -1,0 +1,72 @@
+name: Release
+
+# Starts when release.sh pushes a version tag (vX.Y.Z). Builds and tests the tagged commit (ci.yml),
+# packages the artefact, and only if all of that succeeded publishes a GitHub release for the tag
+# with the artefact attached. GitHub adds the source-code zip itself.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Build and test
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: Package (${{ matrix.name }})
+    needs: ci
+    strategy:
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest }
+          - { name: macos, os: macos-latest }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release library
+        run: cargo build --release --locked -p raindrop_crypto_ffi
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          out="RaindropCrypto-$VERSION-${{ matrix.name }}"
+          mkdir -p "$out/lib" dist
+          cp target/release/libraindrop_crypto_ffi.{so,dylib,a} "$out/lib/" 2>/dev/null || true
+          ls "$out/lib"
+          tar -czf "dist/$out.tar.gz" "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.name }}
+          path: dist/*
+
+  release:
+    name: Publish GitHub release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release for the existing tag
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
