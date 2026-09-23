@@ -23,10 +23,11 @@ debug build without it would make `cargo test` noticeably slower.
 
 ## What `cargo test` covers
 
-**`raindrop_crypto`, unit tests (15)** — one `#[cfg(test)] mod tests` per module:
+**`raindrop_crypto`, unit tests (21)** — one `#[cfg(test)] mod tests` per module:
 
 | Module | Covers |
 |---|---|
+| `attachment` | Round trips at every segment boundary; the length formula inverts exactly and rejects impossible lengths; fresh key and nonce per file; a flipped byte, a truncation at a segment boundary, reordered segments, a wrong key, version or expected hash are refused; failed file operations leave no output. See [Attachments](attachments.md#tests) |
 | `backup` | Recovery-key round trip; a wrong recovery key refused; a mistyped word caught by the BIP-39 checksum; passphrase round trip and tamper detection (a flipped header byte fails to open) |
 | `identity` | A certificate round-trips and verifies; a tampered one does not; an identity survives being reconstructed from its secret; safety numbers are symmetric and depend on the keys |
 | `link` | An offer round-trips (and a truncated one fails); only the offering device's exchange key opens an approval, and only for the exact offer it was sealed to; the commitment changes with any part of the offer |

@@ -3,11 +3,13 @@
 //! - [`session::Session`] is the entry point: one per server profile on a device.
 //! - [`identity`]: user identity keys, device certificates and safety numbers.
 //! - [`validation`]: who a group member really is (a trait, so plugins can add rules).
+//! - [`attachment`]: the chunked format files are encrypted in before they are uploaded.
 //! - [`backup`]: the recovery-key / passphrase sealed key backup.
 //! - [`store`]: the SQLCipher-encrypted local database, including the decrypted message cache.
 //!
 //! Nothing here touches the network; see the `session` module docs for how commits flow.
 
+pub mod attachment;
 pub mod backup;
 pub mod error;
 pub mod identity;

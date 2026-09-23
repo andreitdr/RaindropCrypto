@@ -1,5 +1,6 @@
 //! Everything under this module is exposed to Dart by flutter_rust_bridge_codegen.
 
+pub mod attachment;
 pub mod session;
 
 #[flutter_rust_bridge::frb(init)]

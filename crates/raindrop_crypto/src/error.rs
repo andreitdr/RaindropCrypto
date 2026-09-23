@@ -34,6 +34,10 @@ pub enum CryptoError {
     #[error("not found: {0}")]
     NotFound(String),
 
+    /// Reading or writing a file failed (an attachment being encrypted or decrypted).
+    #[error("file error: {0}")]
+    Io(String),
+
     /// An MLS operation failed.
     #[error("mls error: {0}")]
     Mls(String),

@@ -46,7 +46,7 @@ impl From<CryptoError> for CryptoFailure {
             CryptoError::Verification(_) => (CryptoFailureKind::Verification, None),
             CryptoError::NotFound(_) => (CryptoFailureKind::NotFound, None),
             CryptoError::Malformed(_) => (CryptoFailureKind::Malformed, None),
-            CryptoError::Store(_) | CryptoError::Mls(_) => (CryptoFailureKind::Other, None),
+            CryptoError::Store(_) | CryptoError::Io(_) | CryptoError::Mls(_) => (CryptoFailureKind::Other, None),
         };
         Self { kind, message, user_id }
     }
@@ -284,6 +284,11 @@ impl CryptoSession {
     /// Signs a message attestation over `canonical` with this device's key.
     pub fn sign_message_attestation(&self, canonical: Vec<u8>) -> Result<Vec<u8>> {
         Ok(self.session().sign_message_attestation(&canonical)?)
+    }
+
+    /// Signs the attestation of a message that carries files (context `raindrop/message-attestation/v2`).
+    pub fn sign_message_attestation_v2(&self, canonical: Vec<u8>) -> Result<Vec<u8>> {
+        Ok(self.session().sign_message_attestation_v2(&canonical)?)
     }
 
     /// New device: makes its key and a link offer for an existing device to approve.

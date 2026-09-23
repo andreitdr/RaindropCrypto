@@ -81,6 +81,7 @@ A Cargo workspace of two crates under `crates/`:
 | `session.rs` | `Session`, the entry point: one device's state on one server. Identity, session binding, device linking, key packages, MLS groups, commits, message encrypt/decrypt, the message cache, exported secrets |
 | `identity.rs` | `UserIdentity` (Ed25519), `DeviceCertificate`, `safety_number` |
 | `validation.rs` | `CredentialValidator` (trait) and `PinnedIdentityValidator`, the default |
+| `attachment.rs` | Files: the per-file key and the chunked `raindrop/attachment/v1` format (XChaCha20-Poly1305 STREAM), whose length formula the server relies on |
 | `backup.rs` | `RecoveryKey` (24 BIP-39 words), the Argon2id passphrase path, the sealed blob format |
 | `link.rs` | Device linking: `Offer`, the link-code `commitment`, the X25519 + HKDF + XChaCha20-Poly1305 approval |
 | `store.rs` | `Store`: the SQLCipher-encrypted local database (own keys, identity pins, decrypted message cache) |
@@ -110,7 +111,7 @@ Full reference: [`docs/architecture-overview.md`](docs/architecture-overview.md)
 - **All randomness goes through `random::bytes`**, so every key comes from one place.
 - **Formats are versioned and domain-separated.** Each has a version byte and, where signed or hashed,
   a context string (`raindrop/device-certificate/v1\n`, `raindrop/session-binding/v1\n`,
-  `raindrop/device-link/v1\n`). A new version is a new context, not a change to the old one.
+  `raindrop/device-link/v1\n`, `raindrop/attachment/v1\n`). A new version is a new context, not a change to the old one.
 - **Errors are coarse on purpose.** `CryptoError` variants say *what kind* of failure it was; the detail
   string is for logs and is never parsed. The bridge maps them to `CryptoFailureKind`, which the Dart
   side branches on.
@@ -132,7 +133,7 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 ## Testing
 
-`cargo test` runs 15 unit tests (store, certificates, backup, link) and 12 integration tests in
+`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments) and 12 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

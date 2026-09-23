@@ -66,10 +66,12 @@ let ciphertext = session.encrypt(&group_id, b"hello")?;
 |---|---|
 | Identity | `create_identity`, `restore_identity`, `backup_contents`, `device` |
 | Session binding | `sign_session_challenge` |
+| Message attestations | `sign_message_attestation` (v1), `sign_message_attestation_v2` (a message carrying files) |
 | Linking | `begin_device_link`, `approve_device_link`, `complete_device_link` |
 | Key packages | `generate_key_packages` |
 | Groups | `create_group`, `has_group`, `epoch`, `members`, `group_info`, `add_members`, `remove_members`, `self_update`, `join_by_external_commit`, `join_from_welcome`, `merge_pending_commit`, `discard_pending_commit`, `delete_group` |
 | Messages | `encrypt`, `process`, `receive_message`, `remember_sent`, `export_secret` |
+| Files (module `attachment`, not on `Session`) | `encrypt_file`, `decrypt_file`, `encrypt_bytes`, `decrypt_bytes`, `ciphertext_length` — see [Attachments](attachments.md) |
 
 A few things hold across all of them:
 

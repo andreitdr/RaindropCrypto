@@ -56,6 +56,10 @@ const SESSION_BINDING_CONTEXT: &[u8] = b"raindrop/session-binding/v1\n";
 /// `sign_message_attestation`), so an attestation is never mistaken for any other signature.
 const MESSAGE_ATTESTATION_CONTEXT: &[u8] = b"raindrop/message-attestation/v1\n";
 
+/// The same, for a message that carries files: its canonical encoding goes on to list each file's id
+/// and ciphertext hash, a different layout, so it is signed under its own context.
+const MESSAGE_ATTESTATION_V2_CONTEXT: &[u8] = b"raindrop/message-attestation/v2\n";
+
 /// This device's public identity, as the server and other users see it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceIdentity {
@@ -241,8 +245,19 @@ impl Session {
     /// canonical encoding (channel, client message id, time, type, body); the context string is
     /// added here so the signature is good for nothing else.
     pub fn sign_message_attestation(&self, canonical: &[u8]) -> Result<Vec<u8>> {
+        self.sign_attestation(MESSAGE_ATTESTATION_CONTEXT, canonical)
+    }
+
+    /// [`Self::sign_message_attestation`] for a message that carries files, whose canonical encoding
+    /// also binds each file's id and ciphertext hash — so a reporter cannot pair the author's words
+    /// with somebody else's file.
+    pub fn sign_message_attestation_v2(&self, canonical: &[u8]) -> Result<Vec<u8>> {
+        self.sign_attestation(MESSAGE_ATTESTATION_V2_CONTEXT, canonical)
+    }
+
+    fn sign_attestation(&self, context: &[u8], canonical: &[u8]) -> Result<Vec<u8>> {
         let device = self.require_device()?;
-        let mut payload = MESSAGE_ATTESTATION_CONTEXT.to_vec();
+        let mut payload = context.to_vec();
         payload.extend_from_slice(canonical);
         device.signer.sign(&payload).map_err(mls)
     }

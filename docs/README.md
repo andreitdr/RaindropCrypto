@@ -16,6 +16,7 @@ This wiki documents the feature set as it stands today. Each file covers one are
 | [Groups & messages](groups-and-messages.md) | MLS groups, key packages, commits and epochs, joining, encrypting and receiving, the message cache, exported secrets |
 | [Key backup](key-backup.md) | The recovery key, the Argon2id passphrase path, the sealed blob format |
 | [Device linking](device-linking.md) | Moving an identity onto a new device through a server that cannot read or substitute it |
+| [Attachments](attachments.md) | Files: the per-file key, the chunked `raindrop/attachment/v1` format, the length contract with the server |
 | [Local store](local-store.md) | The SQLCipher database: what it holds, the tables, how it is opened |
 | [Flutter bridge](flutter-bridge.md) | `raindrop_crypto_ffi`, the flat bridge types, error kinds, codegen, the version pin, the build glue |
 | [Wire contracts](wire-contracts.md) | Every byte format the client and server also read, and what has to change together |

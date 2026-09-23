@@ -397,4 +397,14 @@ fn a_message_attestation_is_ed25519_by_the_device_key_over_its_context() {
         key.verify(b"raindrop/session-binding/v1\ncanonical", &signature)
             .is_err()
     );
+
+    // A message with files is signed under its own context, and neither version stands in for the other.
+    let with_files = alice.session.sign_message_attestation_v2(b"canonical").unwrap();
+    let with_files = Signature::from_slice(&with_files).unwrap();
+    key.verify(b"raindrop/message-attestation/v2\ncanonical", &with_files)
+        .expect("the server verifies exactly this");
+    assert!(
+        key.verify(b"raindrop/message-attestation/v1\ncanonical", &with_files)
+            .is_err()
+    );
 }

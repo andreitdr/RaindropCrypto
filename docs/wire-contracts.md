@@ -35,6 +35,20 @@ server issues the nonce (`POST /api/e2ee/session/challenge`, 32 bytes, 2 minutes
 the signature against the device key in the stored certificate
 (`POST /api/e2ee/session/bind`). See [Identity & trust](identity-and-trust.md#session-binding).
 
+## Message attestation
+
+A device signs every message it sends so a recipient can later prove to moderators who wrote it
+(`Session::sign_message_attestation`). The caller passes the canonical bytes (the client's
+`MessagePayload.attestationBytes`, recomputed by the server's `MessageReportService.Canonical`), and the
+core prefixes the context. `"raindrop/message-attestation/v1\n"` covers the channel, client message id,
+send time, type and body. `"raindrop/message-attestation/v2\n"` (`sign_message_attestation_v2`) is for a
+message that carries files: the same fields, then a 4-byte count and each file's id and 32-byte
+ciphertext hash, so a reporter cannot pair the words with another file. The two contexts never verify
+for each other.
+
+**If this changes:** a new context, the client's `attestationBytes`, and the server's `Canonical` /
+`CanonicalWithFiles` (both sides test against the same golden vector).
+
 ## Device link
 
 Two formats, both in `link.rs`:
@@ -64,6 +78,18 @@ to any password session (`GET /api/e2ee/backup`) — the server never opens it. 
 
 **If this changes:** update `backup.rs` and the size limit in `E2eeOptions` on the server if the new
 layout can exceed it.
+
+## Attachment
+
+`attachment.rs`, format `raindrop/attachment/v1`: a version byte, a 19-byte nonce prefix, then 64 KiB
+XChaCha20-Poly1305 segments. Full layout in [Attachments](attachments.md#format-raindropattachmentv1).
+The server never decrypts it, but it relies on the **length formula**
+`ciphertext = 20 + plaintext + 16 × max(1, ⌈plaintext / 65536⌉)` to enforce the owner's size limits, and
+on the SHA-256 of the whole ciphertext to check an upload is complete
+(`RaindropServer/Attachments/AttachmentFormat.cs`, [server doc](../../RaindropServer/docs/attachments.md)).
+
+**If this changes:** a new version byte and context string, `AttachmentFormat` on the server, and the
+client's upload code, which declares the ciphertext length before uploading.
 
 ## MLS group id
 

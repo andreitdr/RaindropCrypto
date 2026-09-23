@@ -18,6 +18,13 @@ The method surface mirrors `Session` one-for-one; see [Architecture overview](ar
 for what each group does. Two free functions sit outside `CryptoSession`: `safety_number` and
 `backup_needs_passphrase`, both `#[frb(sync)]` since neither touches the store.
 
+`api/attachment.rs` holds the [attachment](attachments.md) functions, also free-standing because a
+file's key is its own rather than the session's: `encrypt_attachment_file`, `decrypt_attachment_file`,
+`encrypt_attachment_bytes`, `decrypt_attachment_bytes` (async, on the bridge's thread pool, since they do
+file and crypto work) and `attachment_ciphertext_length` (`sync`). They return the flat
+`SealedAttachment { key, ciphertext_sha256, ciphertext_length }` and `SealedAttachmentBytes { sealed,
+ciphertext }`.
+
 ## Why the bridge types are flat
 
 The generated Dart avoids `freezed`, so there is no `build_runner` step in the client. That means bridge
@@ -46,7 +53,7 @@ values, documented per-field like the two above, rather than a Rust enum with da
 | `Verification(_)` | `Verification` | — |
 | `NotFound(_)` | `NotFound` | — |
 | `Malformed(_)` | `Malformed` | — |
-| `Store(_)`, `Mls(_)` | `Other` | — |
+| `Store(_)`, `Io(_)`, `Mls(_)` | `Other` | — |
 
 `message` is always `error.to_string()` — for logs, never for the UI to parse (same rule as
 `CryptoError` itself). The client's `CryptoEngine` turns this into `CryptoException` with a
