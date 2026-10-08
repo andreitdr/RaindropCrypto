@@ -1,7 +1,20 @@
 # RaindropCrypto
 
-Raindrop's end-to-end encryption core, in Rust. It is kept in its own folder, apart from the Flutter
-client (`../RaindropClient`) and the .NET server (`../RaindropServer`).
+Raindrop's end-to-end encryption core, in Rust: **MLS** (RFC 9420) through OpenMLS. It runs entirely
+on clients — no networking, and no private key ever leaves the device.
+
+It is one of three repositories checked out side by side:
+
+| Project | Role |
+|---|---|
+| **RaindropCrypto** (this repo) | The encryption core and its Flutter binding |
+| [`../RaindropClient`](../RaindropClient) | The Flutter app; the only caller, and it compiles this workspace into itself |
+| [`../RaindropServer`](../RaindropServer) | The self-hosted .NET backend; never links this code, and holds only bytes it cannot read |
+
+**[`docs/`](docs/README.md) is the reference wiki.** Start with
+[Architecture overview](docs/architecture-overview.md), [Roadmap](docs/roadmap.md) for what is and is
+not built, and [Wire contracts](docs/wire-contracts.md) for the formats all three projects must agree
+on. [`CLAUDE.md`](CLAUDE.md) is the condensed guide for coding agents.
 
 | Crate | Role |
 |---|---|
@@ -39,4 +52,7 @@ The Flutter app builds this crate by itself through `RaindropClient/native/raind
   elsewhere, selected in `crates/raindrop_crypto/Cargo.toml`. rusqlite stays on the same major
   version as `openmls_sqlite_storage`, so both use the one SQLCipher build.
 - **Extension point.** `validation::CredentialValidator` decides whether a group member is who they
-  claim to be. The default is `PinnedIdentityValidator`, and a plugin can supply stricter rules.
+  claim to be. The default is `PinnedIdentityValidator`; a plugin supplying stricter rules needs the
+  injection seam that is not built yet — see [Roadmap](docs/roadmap.md).
+- **CI.** Build and test on every push to `main`; a `vX.Y.Z` tag publishes prebuilt libraries the
+  client does not use (it builds from source). See [CI & releases](docs/ci-and-releases.md).

@@ -5,7 +5,21 @@ platform. It is Rust, built on **MLS** (RFC 9420) through OpenMLS, and it runs e
 [server](../../RaindropServer/docs/README.md) never holds a private key and never links this code.
 
 This wiki documents the feature set as it stands today. Each file covers one area; start with
-[Architecture overview](architecture-overview.md) if you're new to the codebase.
+[Architecture overview](architecture-overview.md) if you're new to the codebase, and
+[Roadmap](roadmap.md) for what is and is not built yet.
+
+## The three Raindrop projects
+
+Raindrop is three repositories, checked out side by side in one folder:
+
+| Project | What it is | Its docs |
+|---|---|---|
+| **RaindropCrypto** (this one) | The end-to-end encryption core: Rust, MLS over OpenMLS, no networking | you are here |
+| [RaindropServer](../../RaindropServer/docs/README.md) | The self-hosted .NET backend. Carries bytes it cannot read: ciphertext, group state, sealed backups, device-link blobs | [docs](../../RaindropServer/docs/README.md) · [its E2EE side](../../RaindropServer/docs/e2ee.md) |
+| [RaindropClient](../../RaindropClient/docs/README.md) | The Flutter app. The only caller of this code — it compiles `raindrop_crypto_ffi` into the app | [docs](../../RaindropClient/docs/README.md) · [its crypto doc](../../RaindropClient/docs/crypto.md) |
+
+What binds the three together is not code but byte formats: everything in
+[Wire contracts](wire-contracts.md) has to change in all three at once.
 
 ## Contents
 
@@ -21,6 +35,8 @@ This wiki documents the feature set as it stands today. Each file covers one are
 | [Flutter bridge](flutter-bridge.md) | `raindrop_crypto_ffi`, the flat bridge types, error kinds, codegen, the version pin, the build glue |
 | [Wire contracts](wire-contracts.md) | Every byte format the client and server also read, and what has to change together |
 | [Testing & building](testing.md) | Toolchain, commands, what the tests cover |
+| [CI & releases](ci-and-releases.md) | The GitHub Actions workflows, and why the client does not use their artefacts |
+| [Roadmap](roadmap.md) | Everything implemented today, everything that is not, and what is deliberately not planned |
 
 ## Quick facts
 
@@ -34,16 +50,17 @@ This wiki documents the feature set as it stands today. Each file covers one are
   the app. [RaindropServer](../../RaindropServer/docs/e2ee.md) reads the formats in
   [Wire contracts](wire-contracts.md) but has none of this code.
 - **What's implemented:** device identities and certificates, credential validation with identity
-  pinning, safety numbers, session-binding signatures, device linking, the recovery-key and passphrase
-  backup, the encrypted store with its message cache, MLS groups (add, remove, self-update, welcome,
-  external join, commit merge/discard), message encrypt/decrypt, and exported secrets for call keys. The
-  server's [MLS delivery service](../../RaindropServer/docs/e2ee.md#the-delivery-service) is also
-  implemented and the client's `E2eeApi` wrapper is wired and tested against it.
-- **What's not implemented yet:** the app does not yet drive a channel's group through that delivery
-  service — nothing calls `create_group`/`add_members`/`encrypt` for an actual channel — so encrypted
-  text messages and calls do not reach users yet even though every piece they need is built and tested.
-  A custom `CredentialValidator` cannot yet be injected into a `Session` (see
-  [Identity & trust](identity-and-trust.md#the-validator-seam)).
+  pinning, safety numbers, session-binding signatures, message attestations, device linking, the
+  recovery-key and passphrase backup, the encrypted store with its message cache, MLS groups (add,
+  remove, self-update, welcome, external join, commit merge/discard), message encrypt/decrypt, the
+  chunked attachment format, and exported secrets for call keys.
+- **In use end to end:** the client drives each channel's MLS group through the server's
+  [delivery service](../../RaindropServer/docs/e2ee.md#the-delivery-service), so encrypted text
+  messages, encrypted files and encrypted call media all reach users today. Nothing in this core is
+  built but unused.
+- **What's not implemented yet:** injecting a custom `CredentialValidator` into a `Session` (see
+  [Identity & trust](identity-and-trust.md#the-validator-seam)), a second ciphersuite, scheduled key
+  rotation, and message-cache retention. The full list is in [Roadmap](roadmap.md).
 
 ## Keeping this wiki current
 
@@ -55,3 +72,8 @@ table above.
 
 If a change touches a format in [Wire contracts](wire-contracts.md), also update the server's
 [E2EE doc](../../RaindropServer/docs/e2ee.md) and the client's [crypto doc](../../RaindropClient/docs/crypto.md).
+
+**[Roadmap](roadmap.md) is part of that.** Anything that moves between implemented and not goes there
+in the same change, and a gap that crosses a project boundary is recorded in the other project's
+roadmap too ([RaindropServer](../../RaindropServer/docs/roadmap.md) ·
+[RaindropClient](../../RaindropClient/docs/roadmap.md)).
