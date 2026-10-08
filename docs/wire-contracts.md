@@ -5,6 +5,13 @@ Formats this crate defines that the [client](../../RaindropClient/docs/crypto.md
 check compatibility against, so a change here has to be made in all three places in the same change —
 this crate, the C# that parses or validates it, and any Dart that assumes its shape.
 
+**How they travel.** Client and server talk gRPC, in messages defined by
+[RaindropProto](../../RaindropProto/README.md). Every format below rides inside those messages as an
+opaque protobuf `bytes` field, exactly as this crate produced it; nothing is re-encoded on the way, so
+the transport has no say in any of these layouts. The plaintext *inside* an encrypted message (text,
+file keys and names) is the client's `MessagePayload`, protobuf as well (RaindropProto's
+`payload.proto`); this crate encrypts it without reading it.
+
 ## Device certificate
 
 Defined in `identity.rs` (`DeviceCertificate::to_bytes` / `from_bytes` / `signed_bytes`); parsed on the
