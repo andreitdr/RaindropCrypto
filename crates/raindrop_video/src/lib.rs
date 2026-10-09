@@ -29,6 +29,7 @@ pub mod blur;
 pub mod convert;
 pub mod frame;
 pub mod mask;
+pub mod onnx;
 pub mod pipeline;
 pub mod replace;
 pub mod segmentation;
@@ -40,7 +41,7 @@ use crate::frame::{I420FrameMut, Plane};
 use crate::mask::Mask;
 use crate::pipeline::{Budget, Degradation, MaskClock, MaskWorker, SystemTime, TimeSource};
 use crate::replace::{Background, BackgroundPlanes};
-use crate::segmentation::{CentreOvalSegmenter, Segmenter};
+use crate::segmentation::Segmenter;
 
 /// What went wrong. Coarse on purpose, like the encryption core's: the variant
 /// says what kind of failure it was, and the string is for logs, never parsed.
@@ -138,11 +139,7 @@ impl Effects {
     /// Starts the effects, spawning the segmentation worker when the effect
     /// needs one.
     pub fn new(config: Config) -> Result<Self, Error> {
-        Self::with_parts(
-            config,
-            Box::new(CentreOvalSegmenter::default()),
-            Box::new(SystemTime::default()),
-        )
+        Self::with_parts(config, onnx::best(), Box::new(SystemTime::default()))
     }
 
     /// The seam the tests and a future accelerated backend come in through.
@@ -186,7 +183,7 @@ impl Effects {
         match (self.config.kind, config.kind) {
             (EffectKind::None, EffectKind::None) => {}
             (EffectKind::None, _) => {
-                self.worker = Some(MaskWorker::spawn(Box::new(CentreOvalSegmenter::default())));
+                self.worker = Some(MaskWorker::spawn(onnx::best()));
                 self.clock = MaskClock::new(config.mask_hz);
             }
             (_, EffectKind::None) => self.worker = None,

@@ -732,3 +732,103 @@ fn the_same_frame_and_mask_give_the_same_pixels() {
     // many frames happened to pass before the mask landed.
     assert_eq!(run(), run());
 }
+
+// ── The real segmenter ───────────────────────────────────────────────────────
+//
+// These run only when a model is committed, the same way the client's E2EE
+// integration tests run only when `RAINDROP_TEST_SERVER` names a server and the
+// Rust library is built. See `crates/raindrop_video/models/README.md`.
+//
+// They exist so that dropping the model in is enough to find out whether the
+// shapes this crate assumes are the shapes the model actually has — which is
+// the one thing that cannot be checked while the file is absent.
+
+#[cfg(bundled_model)]
+mod bundled {
+    use super::*;
+    use raindrop_video::onnx::{INPUT_SIZE, OnnxSegmenter};
+
+    #[test]
+    fn the_bundled_model_loads_and_has_the_shape_this_crate_expects() {
+        let mut segmenter = OnnxSegmenter::bundled().expect("the committed model loads");
+
+        assert_eq!(segmenter.input_size(), INPUT_SIZE);
+        assert_eq!(segmenter.name(), "onnx");
+
+        // Flat grey: whatever the model makes of it, a mask of the right size
+        // is what proves the input and output shapes agree with the constants.
+        let grey = vec![128u8; INPUT_SIZE * INPUT_SIZE * 3];
+        let mask = segmenter.segment(&grey).expect("the model runs");
+
+        assert_eq!(mask.width, INPUT_SIZE);
+        assert_eq!(mask.height, INPUT_SIZE);
+        assert_eq!(mask.alpha.len(), INPUT_SIZE * INPUT_SIZE);
+    }
+
+    #[test]
+    fn the_bundled_model_refuses_an_input_of_the_wrong_size() {
+        let mut segmenter = OnnxSegmenter::bundled().expect("the committed model loads");
+
+        assert!(matches!(segmenter.segment(&[0u8; 32]), Err(Error::Segmentation(_))));
+    }
+
+    #[test]
+    fn the_bundled_model_is_what_the_effects_use() {
+        let hand = Hand::default();
+        let effects = Effects::with_parts(
+            Config {
+                kind: EffectKind::Blur,
+                ..Config::default()
+            },
+            raindrop_video::onnx::best(),
+            Box::new(hand),
+        )
+        .expect("the effects start");
+
+        // A build with the model must not quietly fall back to the test
+        // segmenter, which is the failure mode nobody would notice.
+        assert_eq!(effects.backend(), "onnx");
+    }
+
+    #[test]
+    fn a_person_sized_subject_is_found_in_the_middle_rather_than_at_the_edges() {
+        let mut segmenter = OnnxSegmenter::bundled().expect("the committed model loads");
+
+        // Not a real person, so this cannot assert much: a flat field must not
+        // come back as confidently foreground everywhere, which would mean the
+        // normalisation or the output interpretation is wrong rather than the
+        // model being bad.
+        let flat = vec![200u8; INPUT_SIZE * INPUT_SIZE * 3];
+        let mask = segmenter.segment(&flat).expect("the model runs");
+
+        let confident = mask.alpha.iter().filter(|&&a| a > 200).count();
+        assert!(
+            confident < mask.alpha.len(),
+            "a flat field read as entirely foreground, which means the input scale or the output \
+             interpretation is wrong — see SCALE in segmentation's onnx module"
+        );
+    }
+}
+
+#[test]
+fn the_build_says_which_segmenter_it_has() {
+    let hand = Hand::default();
+    let effects = Effects::with_parts(
+        Config {
+            kind: EffectKind::Blur,
+            ..Config::default()
+        },
+        raindrop_video::onnx::best(),
+        Box::new(hand),
+    )
+    .expect("the effects start");
+
+    // Either is a correct build: with the model, the real segmenter; without
+    // it, a weaker effect rather than no camera. What must not happen is a
+    // build that claims one and runs the other.
+    let backend = effects.backend();
+    assert!(
+        backend == "onnx" || backend == "centre-oval",
+        "unexpected segmenter: {backend}"
+    );
+}

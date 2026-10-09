@@ -83,8 +83,11 @@ A Cargo workspace of three crates under `crates/`:
   to I420 camera frames **in place**, so there is no second track and the frame cryptor never notices.
   It depends on neither of the others and holds no key material. Its one `unsafe` is `frame.rs`, the
   borrowed-frame boundary; everything else is safe Rust over slices. Segmentation is behind the
-  `Segmenter` trait, and the only implementation so far is a deterministic test one — see
-  [`docs/video-effects.md`](docs/video-effects.md) and the roadmap.
+  `Segmenter` trait: an ONNX model run by `tract` (pure Rust, so cargokit needs no toolchain of its
+  own), with a deterministic fallback. **No model file is committed yet** — `build.rs` leaves
+  `cfg(bundled_model)` off, `onnx::best()` falls back, and four tests skip, so a build without it is
+  a build with a weaker effect rather than no camera. `crates/raindrop_video/models/README.md` has
+  the filename, licence, shapes and commands; see [`docs/video-effects.md`](docs/video-effects.md).
 
 `raindrop_crypto/src/`:
 
@@ -145,8 +148,9 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 ## Testing
 
-`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments), 22 camera-effects
-tests in `crates/raindrop_video/tests/effects.rs`, and 12 integration tests in
+`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments), 23 camera-effects
+tests in `crates/raindrop_video/tests/effects.rs` (four more run once a segmentation model is
+committed), and 12 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

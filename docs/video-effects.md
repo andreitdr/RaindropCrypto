@@ -175,20 +175,50 @@ panic. An error is a mask that did not arrive, which the pipeline survives by
 keeping the previous one: strictly better than a blank mask, which would un-blur
 the background for a frame.
 
-**`CentreOvalSegmenter` is the only one implemented so far.** It marks a circle
-in the middle of the frame as foreground. Not a mock — it is a real,
-deterministic segmenter, and it is what lets every pixel path in the crate be
-tested without an inference runtime or a model file in the way. The tests assert
-on a shape they chose, so a regression in the pixel work shows up as a wrong
-picture rather than as a worse mask.
+Two implementations:
 
-**Still to come:** a real person segmenter. See
-[roadmap](roadmap.md) — it needs a model file chosen, licensed and committed,
-and an inference runtime added to this crate's dependencies.
+**`onnx::OnnxSegmenter`** is the real one: an ONNX model run by `tract`. Pure
+Rust, which is the whole reason for that choice — the one cargokit build has to
+produce this crate for five targets with no toolchain of its own, and a runtime
+with a C++ core (ONNX Runtime, TensorFlow Lite) would need linking solved
+separately on each. The input and output shapes are **fixed as named constants**
+and the model is checked against them at load, because a model of an unexpected
+shape should be refused when it can be reported rather than produce a quietly
+wrong mask on every frame.
+
+**`segmentation::CentreOvalSegmenter`** marks a circle in the middle of the
+frame as foreground. Not a mock — a real, deterministic segmenter, and what lets
+every pixel path in the crate be tested without an inference runtime or a model
+file in the way. The tests assert on a shape they chose, so a regression in the
+pixel work shows up as a wrong picture rather than as a worse mask.
+
+### No model is committed yet
+
+`models/README.md` has the filename, the licence, the expected shapes, the exact
+fetch-and-convert commands and a table to record the hashes in. Until the file is
+there:
+
+- `build.rs` leaves `cfg(bundled_model)` off, so `OnnxSegmenter::bundled` does
+  not exist and nothing tries to `include_bytes!` a missing file.
+- `onnx::best()` returns `CentreOvalSegmenter`, so **a build without the model is
+  a build with a weaker effect, not a build without a camera.**
+- `Effects::backend()` says which one is in use, and
+  `the_build_says_which_segmenter_it_has` asserts a build never claims one and
+  runs the other.
+- The four `#[cfg(bundled_model)]` tests are skipped — the same pattern as the
+  client's E2EE integration tests, which run only when `RAINDROP_TEST_SERVER`
+  names a server and the Rust library is built.
+
+Those tests are the point of the arrangement: dropping the model in is enough to
+find out whether the shapes this crate assumes are the shapes the model actually
+has, which is the one thing that cannot be checked while the file is absent.
+A model is committed under a **new filename**, never edited in place, the same
+rule the encryption core's byte formats follow.
 
 ## Tests
 
-`cargo test -p raindrop_video` — 22 tests in `tests/effects.rs`, covering the
+`cargo test -p raindrop_video` — 23 tests in `tests/effects.rs`, plus four that
+run only with a model committed, covering the
 frame boundary (stride padding, odd dimensions, refusals), blur (background
 variance drops, foreground variance does not), replacement (the right pixels,
 and the refusals), the mask (centring, soft edges, smoothing, convergence,

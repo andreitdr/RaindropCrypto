@@ -18,7 +18,7 @@ until the client drives it and the server carries it:
 | Identity | Ed25519 user identity keys, device certificates signed by them, `safety_number` (60 digits) | [Identity & trust](identity-and-trust.md) |
 | Trust | `PinnedIdentityValidator`: every credential in every group is verified and pinned trust-on-first-use, `IdentityChanged` surfaced as a user decision, `accept_changed_identity` / `mark_verified` | [Identity & trust](identity-and-trust.md) |
 | Session binding | `sign_session_challenge`, so a server session can be tied to a device key | [Identity & trust](identity-and-trust.md) |
-| Camera effects | The frame boundary (I420, stride-safe), background blur, background replacement, mask stretch and temporal smoothing, the two-clock pipeline and the degradation ladder, all behind a `Segmenter` seam | [Camera effects](video-effects.md) |
+| Camera effects | The frame boundary (I420, stride-safe), background blur, background replacement, mask stretch and temporal smoothing, the two-clock pipeline and the degradation ladder, and an ONNX segmenter over `tract` — awaiting only the model file | [Camera effects](video-effects.md) |
 | Attestations | `sign_message_attestation` (v1) and `sign_message_attestation_v2` for a message carrying files | [Wire contracts](wire-contracts.md#message-attestation) |
 | Groups | `create_group`, `add_members`, `remove_members`, `self_update`, `join_from_welcome`, `join_by_external_commit`, `group_info`, `members`, `epoch`, `merge_pending_commit` / `discard_pending_commit` (commit races), `delete_group` | [Groups & messages](groups-and-messages.md) |
 | Key packages | `generate_key_packages`, one-time and last-resort, `MLSMessage`-wrapped as the server requires | [Groups & messages](groups-and-messages.md) |
@@ -38,12 +38,13 @@ server's delivery service, so encrypted text messages and encrypted calls reach 
 
 ## Not implemented yet
 
-- **A real person segmenter for the camera effects.** `raindrop_video`'s whole pixel pipeline is
-  built and tested — the frame boundary, blur, background replacement, the mask stretch and
-  smoothing, the degradation ladder — behind the `Segmenter` seam, but the only implementation is
-  `CentreOvalSegmenter`, which finds a circle in the middle of the frame. A real one needs a
-  segmentation model chosen, licensed and committed, and an inference runtime added to the crate's
-  dependencies. Nothing else in the crate changes. [Camera effects](video-effects.md#segmentation)
+- **The segmentation model itself.** `raindrop_video` is complete otherwise: the pixel pipeline, and
+  an ONNX segmenter (`tract`) that loads a model and checks it against the shapes the crate expects.
+  No model file is committed, so `cfg(bundled_model)` is off, `onnx::best()` falls back to the
+  deterministic `CentreOvalSegmenter`, and four tests are skipped. `crates/raindrop_video/models/README.md`
+  has the filename, licence, shapes and the exact commands; dropping the file in is the whole change,
+  and those four tests are what then confirm the shapes agree.
+  [Camera effects](video-effects.md#no-model-is-committed-yet)
 - **Injecting a `CredentialValidator` into a `Session`.** The trait is the seam and
   `PinnedIdentityValidator` is built internally by `Session::validator`, so a plugin cannot supply
   stricter rules yet. [Identity & trust](identity-and-trust.md#the-validator-seam)

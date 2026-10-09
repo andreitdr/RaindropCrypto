@@ -9,4 +9,11 @@ publish.workspace = true
 [dependencies]
 thiserror = "2"
 
+# Pure Rust, which is the whole reason for it: cargokit builds this crate for
+# five targets with no toolchain of its own, and an inference runtime with a C++
+# core (ONNX Runtime, TensorFlow Lite) would need linking solved separately on
+# each. See docs/video-effects.md; `Segmenter` is the seam a faster, accelerated
+# backend comes in through later, once there is something to measure it against.
+tract-onnx = "0.21"
+
 [dev-dependencies]
