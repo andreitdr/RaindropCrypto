@@ -24,6 +24,14 @@ model you fetch disagrees, correct the constants rather than reshaping around
 them — and run `cargo test -p raindrop_video` with the model present, which
 checks them.
 
+**The shapes have been checked against the published file**, with TensorFlow's
+own interpreter on `selfie_segmenter.tflite` fetched from the URL below: input
+`input_1` is `1 × 256 × 256 × 3` float32 and output `activation_10` is
+`1 × 256 × 256 × 1` float32. So the constants above are right and only the
+conversion is outstanding. `float16` in the URL is the *weight* quantisation;
+the tensors either side are float32, which is what `OnnxSegmenter::from_bytes`
+pins with `with_input_fact`.
+
 ## Getting it
 
 Google publishes the model as TensorFlow Lite, so there are two steps. Run them
@@ -40,6 +48,24 @@ python3 -m pip install tf2onnx onnx && \
     --tflite selfie_segmenter.tflite --output selfie_segmenter_v1.onnx
 ```
 
+Three findings from attempting exactly that, so the next attempt does not
+repeat them:
+
+- **tf2onnx needs TensorFlow installed even for the `--tflite` path** — it
+  imports it at module load, long before it looks at the file. That is ~200 MB
+  of wheel for one 250 KB conversion, which is the main reason the file is not
+  simply committed by whoever happens to build next.
+- **Use a Python that current TensorFlow is actually built for.** On the
+  reference machine, Python 3.9 (Xcode's) with `tensorflow==2.20.0` and
+  `tf2onnx==1.16.1` never finishes: it stalls inside TensorFlow's own locking
+  (`[mutex.cc : 452] RAW: Lock blocking`) with the ONNX file never written. A
+  3.11/3.12 interpreter with a TensorFlow release of that era is the thing to
+  try next. pip also warns that tf2onnx wants `protobuf~=3.20` while
+  TensorFlow 2.20 requires protobuf 6.
+- **The lighter, TensorFlow-free `tflite2onnx` cannot do this model**: it stops
+  at `Unsupported TFLite OP: 117 HARD_SWISH`, and warns that it does not
+  handle float16 tensors either. Not a path worth retrying.
+
 Then record what you actually got, so a later reader can tell whether the file
 has changed under them:
 
@@ -53,8 +79,12 @@ them to drift apart.
 
 | File | SHA-256 |
 |---|---|
-| `selfie_segmenter.tflite` (source, not committed) | _record it here_ |
+| `selfie_segmenter.tflite` (source, not committed) | `191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b` (fetched 2026-10-09) |
 | `selfie_segmenter_v1.onnx` (committed) | _record it here_ |
+
+The source hash is recorded although the file is not kept: `latest/` in that URL
+is a moving target, and a later reader needs to be able to tell whether the file
+they get is the one this ONNX came from.
 
 ## Why it is committed rather than downloaded or shipped as an asset
 
