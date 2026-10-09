@@ -71,11 +71,48 @@ pub fn radius_for(height: usize, strength: f32) -> usize {
     ((height as f32) * fraction).round().max(0.0) as usize
 }
 
+/// How many columns the vertical pass carries at once.
+///
+/// The vertical pass is the expensive half, and not because of the arithmetic:
+/// walking one column touches a new cache line for every pixel. Carrying a
+/// block of columns together means each line that is loaded serves the whole
+/// block, and the inner loops become contiguous runs the compiler can
+/// vectorise. 32 is one 64-byte line of `u8` either side of any alignment.
+const COLUMN_BLOCK: usize = 32;
+
+/// Divides by the window width without dividing.
+///
+/// `sum / window` once per pixel is six million integer divisions a frame at
+/// 540p, and an integer division is an order of magnitude dearer than a
+/// multiply. This is the textbook reciprocal: `floor(sum * m / 2^32)` with
+/// `m = ceil(2^32 / window)`.
+///
+/// **It is exact, not an approximation.** With `m = ceil(2^32 / d)` the error
+/// `e = m * d - 2^32` is smaller than `d`, and the identity holds for every
+/// `sum` up to `2^32 / e`. Here `d` is `2 * radius + 1` and `sum` is at most
+/// `255 * d`, so even a radius of a thousand leaves four orders of magnitude of
+/// headroom. The blurred planes come out byte-for-byte as they did with the
+/// division, which is what the determinism test pins.
+#[derive(Clone, Copy)]
+struct Reciprocal(u64);
+
+impl Reciprocal {
+    fn of(window: u32) -> Self {
+        Self(((1u64 << 32) + u64::from(window) - 1) / u64::from(window))
+    }
+
+    #[inline(always)]
+    fn apply(self, sum: u32) -> u8 {
+        ((u64::from(sum) * self.0) >> 32) as u8
+    }
+}
+
 fn box_pass_horizontal(source: &[u8], out: &mut [u8], width: usize, height: usize, radius: usize) {
-    let window = (radius * 2 + 1) as u32;
+    let mean = Reciprocal::of((radius * 2 + 1) as u32);
 
     for y in 0..height {
         let row = &source[y * width..y * width + width];
+        let out_row = &mut out[y * width..y * width + width];
 
         // A running sum, so each output pixel costs one add and one subtract
         // however wide the window is. Edges clamp to the outermost pixel, which
@@ -87,7 +124,7 @@ fn box_pass_horizontal(source: &[u8], out: &mut [u8], width: usize, height: usiz
         sum += u32::from(row[0]) * radius as u32;
 
         for x in 0..width {
-            out[y * width + x] = (sum / window) as u8;
+            out_row[x] = mean.apply(sum);
 
             let leaving = row[x.saturating_sub(radius)];
             let entering = row[(x + radius + 1).min(width - 1)];
@@ -97,21 +134,93 @@ fn box_pass_horizontal(source: &[u8], out: &mut [u8], width: usize, height: usiz
 }
 
 fn box_pass_vertical(source: &[u8], out: &mut [u8], width: usize, height: usize, radius: usize) {
-    let window = (radius * 2 + 1) as u32;
+    let mean = Reciprocal::of((radius * 2 + 1) as u32);
+    let mut sums = [0u32; COLUMN_BLOCK];
 
-    for x in 0..width {
-        let mut sum: u32 = 0;
+    for start in (0..width).step_by(COLUMN_BLOCK) {
+        let span = COLUMN_BLOCK.min(width - start);
+        let columns = &mut sums[..span];
+
+        columns.fill(0);
         for y in 0..=radius {
-            sum += u32::from(source[y.min(height - 1) * width + x]);
+            let row = &source[y.min(height - 1) * width + start..][..span];
+            for (sum, &pixel) in columns.iter_mut().zip(row) {
+                *sum += u32::from(pixel);
+            }
         }
-        sum += u32::from(source[x]) * radius as u32;
+        let first = &source[start..start + span];
+        for (sum, &pixel) in columns.iter_mut().zip(first) {
+            *sum += u32::from(pixel) * radius as u32;
+        }
 
         for y in 0..height {
-            out[y * width + x] = (sum / window) as u8;
+            let out_row = &mut out[y * width + start..][..span];
+            for (slot, &sum) in out_row.iter_mut().zip(columns.iter()) {
+                *slot = mean.apply(sum);
+            }
 
-            let leaving = source[y.saturating_sub(radius) * width + x];
-            let entering = source[(y + radius + 1).min(height - 1) * width + x];
-            sum = sum + u32::from(entering) - u32::from(leaving);
+            let leaving = &source[y.saturating_sub(radius) * width + start..][..span];
+            let entering = &source[(y + radius + 1).min(height - 1) * width + start..][..span];
+            for ((sum, &out), &into) in columns.iter_mut().zip(leaving).zip(entering) {
+                *sum = *sum + u32::from(into) - u32::from(out);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The reciprocal is the one piece of cleverness in this file, and the
+    /// whole case for it is that it is *exact*. So this checks it against the
+    /// division it replaces, for every window a radius can produce and every
+    /// sum that window can hold — which is the entire input domain, not a
+    /// sample of it.
+    #[test]
+    fn the_reciprocal_divides_exactly() {
+        for radius in [0usize, 1, 2, 3, 7, 23, 43, 64, 128, 512, 1024] {
+            let window = (radius * 2 + 1) as u32;
+            let mean = Reciprocal::of(window);
+
+            for sum in 0..=255 * window {
+                assert_eq!(
+                    u32::from(mean.apply(sum)),
+                    sum / window,
+                    "radius {radius}, window {window}, sum {sum}"
+                );
+            }
+        }
+    }
+
+    /// The vertical pass carries columns in blocks, so a width that is not a
+    /// multiple of the block has a short last one. Compared against a plain
+    /// column-at-a-time pass rather than against recorded numbers, so the
+    /// comparison stays true if the radius or the blocking ever change.
+    #[test]
+    fn blocking_the_vertical_pass_changes_nothing() {
+        for (width, height) in [(1usize, 1usize), (31, 5), (32, 8), (33, 8), (65, 3), (96, 64)] {
+            let source: Vec<u8> = (0..width * height).map(|i| (i * 37 % 251) as u8).collect();
+
+            for radius in [1usize, 2, 5] {
+                let mut blocked = vec![0u8; width * height];
+                box_pass_vertical(&source, &mut blocked, width, height, radius);
+
+                let window = (radius * 2 + 1) as u32;
+                let mut plain = vec![0u8; width * height];
+                for x in 0..width {
+                    for y in 0..height {
+                        let mut sum = 0u32;
+                        for tap in 0..=(radius * 2) {
+                            let row = (y + tap).saturating_sub(radius).min(height - 1);
+                            sum += u32::from(source[row * width + x]);
+                        }
+                        plain[y * width + x] = (sum / window) as u8;
+                    }
+                }
+
+                assert_eq!(blocked, plain, "{width}x{height}, radius {radius}");
+            }
         }
     }
 }

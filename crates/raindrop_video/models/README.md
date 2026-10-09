@@ -4,83 +4,76 @@
 a person. Nothing else in the crate depends on which one — see
 [Camera effects](../../../docs/video-effects.md#segmentation) for the seam.
 
-**No model is committed yet.** Until one is, `build.rs` leaves
-`cfg(bundled_model)` off, `OnnxSegmenter::bundled` does not exist, and the crate
-falls back to `CentreOvalSegmenter`. Everything builds and every test passes
-without it; the real segmenter appears the moment the file is dropped in here.
-
-## What to put here
+`selfie_segmenter_v1.onnx` is committed here, so `build.rs` sets
+`cfg(bundled_model)`, `OnnxSegmenter::bundled` exists and `onnx::best()` returns
+it. A checkout *without* the file still builds: the crate falls back to
+`CentreOvalSegmenter` and four tests skip themselves. That fallback is for the
+crate's own sake, not for shipping — the Flutter bridge refuses to create
+effects at all when no model is bundled, because an oval where a person should
+be is worse than a plain camera.
 
 | | |
 |---|---|
-| Filename | `selfie_segmenter_v1.onnx` |
+| File | `selfie_segmenter_v1.onnx` |
 | Model | MediaPipe Selfie Segmentation (general) |
 | Licence | Apache-2.0 |
-| Input | `1 × 256 × 256 × 3` float32, NHWC, RGB, each channel scaled to 0..1 |
-| Output | `1 × 256 × 256 × 1` float32, a sigmoid confidence that the pixel is a person |
+| Input | `input_1`, `1 × 256 × 256 × 3` float32, NHWC, RGB, each channel scaled to 0..1 |
+| Output | `activation_10`, `1 × 256 × 256 × 1` float32, a sigmoid confidence that the pixel is a person |
+| Opset | 17 |
+| Size | ~440 KB |
 
-Those shapes are what `segmentation::onnx` expects, as named constants. If the
-model you fetch disagrees, correct the constants rather than reshaping around
-them — and run `cargo test -p raindrop_video` with the model present, which
-checks them.
+Those shapes are what `segmentation::onnx` pins, as named constants, and they
+are checked against the published TensorFlow Lite file every time
+[`convert.py`](convert.py) runs. If a future model disagrees, correct the
+constants rather than reshaping around them, and run
+`cargo test -p raindrop_video`, which checks them against the real file.
 
-**The shapes have been checked against the published file**, with TensorFlow's
-own interpreter on `selfie_segmenter.tflite` fetched from the URL below: input
-`input_1` is `1 × 256 × 256 × 3` float32 and output `activation_10` is
-`1 × 256 × 256 × 1` float32. So the constants above are right and only the
-conversion is outstanding. `float16` in the URL is the *weight* quantisation;
-the tensors either side are float32, which is what `OnnxSegmenter::from_bytes`
-pins with `with_input_fact`.
+## Rebuilding it
 
-## Getting it
-
-Google publishes the model as TensorFlow Lite, so there are two steps. Run them
-from this folder.
+Google publishes this model as TensorFlow Lite only, and the conversion needs
+two steps that are not obvious. Both are in [`convert.py`](convert.py), which is
+committed for exactly that reason: it fetches the published file, converts it,
+rewrites the one operator tf2onnx cannot, and then **checks the result against
+the TensorFlow Lite model it came from** on MediaPipe's own test photographs.
 
 ```bash
-curl -L -o selfie_segmenter.tflite \
-  https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite
+python3 -m venv venv
+./venv/bin/pip install 'tensorflow==2.17.1' 'tf2onnx==1.16.1' onnx \
+    'tf-keras==2.17.0' onnxruntime 'protobuf==4.25.5' pillow
+./venv/bin/python convert.py
 ```
 
-```bash
-python3 -m pip install tf2onnx onnx && \
-  python3 -m tf2onnx.convert --opset 13 \
-    --tflite selfie_segmenter.tflite --output selfie_segmenter_v1.onnx
-```
+`.gitignore` keeps everything the script fetches or builds on the way out of the
+repository; only the ONNX is committed.
 
-Three findings from attempting exactly that, so the next attempt does not
-repeat them:
+Four things that cost time to find out, so nobody pays for them twice:
 
-- **tf2onnx needs TensorFlow installed even for the `--tflite` path** — it
-  imports it at module load, long before it looks at the file. That is ~200 MB
-  of wheel for one 250 KB conversion, which is the main reason the file is not
-  simply committed by whoever happens to build next.
-- **Use a Python that current TensorFlow is actually built for.** On the
-  reference machine, Python 3.9 (Xcode's) with `tensorflow==2.20.0` and
-  `tf2onnx==1.16.1` never finishes: it stalls inside TensorFlow's own locking
-  (`[mutex.cc : 452] RAW: Lock blocking`) with the ONNX file never written. A
-  3.11/3.12 interpreter with a TensorFlow release of that era is the thing to
-  try next. pip also warns that tf2onnx wants `protobuf~=3.20` while
-  TensorFlow 2.20 requires protobuf 6.
-- **The lighter, TensorFlow-free `tflite2onnx` cannot do this model**: it stops
-  at `Unsupported TFLite OP: 117 HARD_SWISH`, and warns that it does not
-  handle float16 tensors either. Not a path worth retrying.
-
-Then record what you actually got, so a later reader can tell whether the file
-has changed under them:
-
-```bash
-shasum -a 256 selfie_segmenter.tflite selfie_segmenter_v1.onnx
-```
-
-Write both hashes into the table below, commit `selfie_segmenter_v1.onnx`, and
-delete the `.tflite` — the ONNX file is the artefact, and keeping both invites
-them to drift apart.
+- **Opset 17, not 13.** ONNX only gained `HardSwish` at opset 14, and this model
+  has eleven of them. At 13 the conversion "succeeds" and produces a model that
+  cannot run.
+- **One operator has to be rewritten by hand.** `TFL_Convolution2DTransposeBias`
+  is a TFLite *custom* op — MediaPipe's fused transpose convolution and bias —
+  which tf2onnx leaves in the graph under its TFLite name. Neither tract nor
+  onnxruntime will execute that. `convert.py` replaces it with the standard
+  `ConvTranspose` it is; the docstring explains how its attributes are derived.
+- **tf2onnx needs TensorFlow installed even for `--tflite`**, and a Python that
+  current TensorFlow is actually built for. On the reference machine, Xcode's
+  Python 3.9 with TensorFlow 2.20 stalls inside TensorFlow's own locking
+  (`[mutex.cc : 452] RAW: Lock blocking`) and never writes a file; Homebrew's
+  `python@3.12` with the pins above takes about a second. The TensorFlow-free
+  `tflite2onnx` cannot read this model at all (`HARD_SWISH`, and no float16),
+  and neither can `tract-tflite` (it has no `DEQUANTIZE` for float16 weights) —
+  which is why this is an ONNX file and not the TFLite one.
+- **The result is not byte-reproducible.** tf2onnx's output differs run to run,
+  so the hash below identifies the committed file rather than being a target to
+  reproduce. What *is* reproducible is the behaviour: `convert.py` fails unless
+  the rewritten graph agrees with the TensorFlow Lite model to within 1e-3 and
+  on 99.9% of pixels either side of 0.5.
 
 | File | SHA-256 |
 |---|---|
 | `selfie_segmenter.tflite` (source, not committed) | `191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b` (fetched 2026-10-09) |
-| `selfie_segmenter_v1.onnx` (committed) | _record it here_ |
+| `selfie_segmenter_v1.onnx` (committed) | `df82b0aca8cdd773033b95f2c36ab5091580da193f239ea70de9bf93fc9d6e25` |
 
 The source hash is recorded although the file is not kept: `latest/` in that URL
 is a moving target, and a later reader needs to be able to tell whether the file

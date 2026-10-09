@@ -6,10 +6,11 @@
 //! [`crate::segmentation::Segmenter`] is the seam a faster, accelerated backend
 //! comes in through later — once there is something to measure it against.
 //!
-//! **The model is not committed yet**, so [`OnnxSegmenter::bundled`] exists only
-//! when `models/` holds it (see `models/README.md`, and `build.rs` for the
-//! wiring). Everything here works on any model of the documented shape, and
-//! [`OnnxSegmenter::from_bytes`] is how the tests reach it.
+//! The model is committed, so [`OnnxSegmenter::bundled`] exists — but it is
+//! still conditional on `models/` holding it (see `models/README.md`, and
+//! `build.rs` for the wiring), because a checkout without it should build
+//! rather than fail. Everything here works on any model of the documented
+//! shape, and [`OnnxSegmenter::from_bytes`] is how the tests reach it.
 
 use tract_onnx::prelude::*;
 

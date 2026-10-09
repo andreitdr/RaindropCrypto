@@ -55,8 +55,8 @@ unit test beside the code it tests.
 **`raindrop_crypto_ffi`** has no tests of its own — it is a thin conversion layer over `Session`, exercised
 by the client's Dart tests instead.
 
-**`raindrop_video` (23, `tests/effects.rs`, plus four skipped until a segmentation model is
-committed)** — the camera effects, driven over real frames with real stride padding. Full detail in [Camera effects](video-effects.md#tests); what carries them is two test
+**`raindrop_video` (27 in `tests/effects.rs`, four of them only with the segmentation model
+present, plus two in `blur.rs`)** — the camera effects, driven over real frames with real stride padding. Full detail in [Camera effects](video-effects.md#tests); what carries them is two test
 doubles worth knowing about:
 
 - **A hand-wound clock** whose every *read* advances it by a set step. `Effects::process` reads it once

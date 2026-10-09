@@ -1,0 +1,7 @@
+# What convert.py fetches and builds on the way to the committed ONNX. The ONNX
+# is the artefact; keeping the TFLite beside it only invites the two to drift.
+selfie_segmenter.tflite
+selfie_segmenter_raw.onnx
+# MediaPipe's test pictures, fetched to check the conversion and then deleted.
+*.jpg
+venv/

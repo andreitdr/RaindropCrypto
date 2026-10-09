@@ -1,10 +1,10 @@
 //! Compiles the segmentation model in when it is present.
 //!
-//! The model is a binary artefact with its own licence and provenance, fetched
-//! and converted by the command in `models/README.md`. Until it is committed,
-//! `cfg(bundled_model)` is off and `OnnxSegmenter::bundled` does not exist — so
-//! the crate, its tests and the whole client build work without it, and the
-//! real segmenter appears the moment the file is dropped in.
+//! The model is a binary artefact with its own licence and provenance, built by
+//! `models/convert.py`. One is committed, but this stays conditional: without
+//! it `cfg(bundled_model)` is off and `OnnxSegmenter::bundled` does not exist,
+//! so the crate, its tests and the whole client build still work — and the real
+//! segmenter appears the moment the file is there.
 
 use std::path::Path;
 

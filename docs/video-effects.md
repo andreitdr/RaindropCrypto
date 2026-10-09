@@ -191,6 +191,22 @@ The radius is a **fraction of the frame's height** (`blur::radius_for`), so the
 effect looks the same at every capture resolution — a fixed pixel radius is
 heavy at 360p and barely visible at 1080p.
 
+Two details of the implementation are there for speed and are worth not undoing,
+since both are measured in [What it actually costs](#what-it-actually-costs):
+
+- **The window mean is a reciprocal multiply, not a division.** At 540p there
+  are six million `sum / window` per frame, and an integer division costs an
+  order of magnitude more than a multiply. `blur::Reciprocal` is the textbook
+  `floor(sum * ceil(2^32 / window) / 2^32)`, and it is **exact** rather than
+  approximate over the whole range a box window can produce —
+  `the_reciprocal_divides_exactly` checks every value, so the blurred planes
+  stay byte-for-byte what the division gave.
+- **The vertical pass carries 32 columns at a time.** Walking a single column
+  touches a new cache line for every pixel; a block means each line that is
+  loaded serves all 32, and the inner loops become contiguous runs the compiler
+  can vectorise. `blocking_the_vertical_pass_changes_nothing` pins that against
+  a plain column-at-a-time pass, short last block included.
+
 ## Background replacement
 
 A replacement image is converted to I420 **once**, at the frame's size, and
@@ -233,6 +249,35 @@ frame inside budget resets the count — a first frame touching cold caches, or
 one scheduling hiccup, must not permanently turn the effect off.
 `one_slow_frame_does_not_degrade_anything` is that test.
 
+### What it actually costs
+
+Measured on an Apple-silicon Mac, blur at `Config::default()`, timing
+`Effects::process` on the calling thread at 24 fps with the segmentation worker
+running beside it:
+
+| Capture | p50 | p95 | Ladder |
+|---|---|---|---|
+| 640×360 | 2.5 ms | 3.8 ms | never steps |
+| 960×540 (the default) | 5.7 ms | 8.2 ms | never steps |
+| 1280×720 | 12.5 ms | 14.0 ms | never steps |
+
+`EffectKind::None` is ~300 ns, which is the frame boundary and nothing else.
+
+Those numbers are **after** two changes to `blur.rs` that were worth making
+precisely because the ladder was stepping all the way down at 720p before them:
+the per-pixel `sum / window` became a reciprocal multiply (six million integer
+divisions a frame at 540p, and a division costs an order of magnitude more than
+a multiply), and the vertical pass now carries 32 columns at a time, because
+walking one column touches a fresh cache line for every pixel. Together they
+took 540p from 7.8 ms to 5.7 ms and 720p from 14.6 ms — degrading to no effect
+at all — to 12.5 ms, which holds.
+
+A phone several times slower than this will step the ladder down at 540p, which
+is what the ladder is for. If that turns out to be the common case rather than
+the exception, the next move is blurring a half-resolution copy and upsampling:
+the blur is six passes over the planes and the composite is one, so that is a
+roughly 4× saving on the expensive part for a difference this radius hides.
+
 ## Segmentation
 
 `segmentation::Segmenter` is the seam, for two reasons. The pixel work is most
@@ -264,45 +309,63 @@ every pixel path in the crate be tested without an inference runtime or a model
 file in the way. The tests assert on a shape they chose, so a regression in the
 pixel work shows up as a wrong picture rather than as a worse mask.
 
-### No model is committed yet
+### The model
 
-`models/README.md` has the filename, the licence, the expected shapes, the exact
-fetch-and-convert commands and a table to record the hashes in. Until the file is
-there:
+`models/selfie_segmenter_v1.onnx` — MediaPipe Selfie Segmentation (general),
+Apache-2.0, about 440 KB, `include_bytes!`d into the binary. `models/README.md`
+has the shapes, the hashes and the provenance; `models/convert.py` rebuilds it
+from Google's published TensorFlow Lite file and **verifies the result against
+that file** on real photographs before writing it. Read that README before
+touching either, because the conversion has two steps nobody would guess: ONNX
+only gained `HardSwish` at opset 14, and MediaPipe's fused transpose convolution
+is a TFLite *custom* op that has to be rewritten as standard ONNX by hand.
 
-- `build.rs` leaves `cfg(bundled_model)` off, so `OnnxSegmenter::bundled` does
-  not exist and nothing tries to `include_bytes!` a missing file.
-- `onnx::best()` returns `CentreOvalSegmenter`, so a build without the model is a
-  build with a weaker effect rather than one that cannot composite at all.
-- **The bridge refuses anyway.** `video_effects_create` returns `Unsupported`
-  when `onnx::model_bundled()` is false, and `video_effects_capabilities()`
-  reports `available: false`, so the client offers no effect at all. An oval
-  where a person should be is worse than a plain camera, and the fallback
-  segmenter exists to keep the crate's own tests and the compositing path
-  honest, not to be shipped. That is why the UI asks the native side instead of
-  branching on the platform.
+A new model is a **new filename**, with a new `MODEL_FILE` and new
+`bundled_model` wiring — never an edit in place, the same rule the encryption
+core's byte formats follow.
+
+**It is still conditional, on purpose.** A checkout without the file has to
+build, so:
+
+- `build.rs` sets `cfg(bundled_model)` only when it sees the file, and
+  `OnnxSegmenter::bundled` does not exist otherwise — nothing tries to
+  `include_bytes!` something missing.
+- `onnx::best()` then returns `CentreOvalSegmenter`, so the crate can still
+  composite and every pixel test still runs.
+- **But the bridge refuses.** `video_effects_create` returns `Unsupported` when
+  `onnx::model_bundled()` is false and `video_effects_capabilities()` reports
+  `available: false`, so the client offers no effect at all rather than an oval
+  where a person should be. The fallback is for this crate's tests, not for
+  shipping — which is why the UI asks the native side instead of branching on
+  the platform.
 - `Effects::backend()` says which one is in use, and
   `the_build_says_which_segmenter_it_has` asserts a build never claims one and
   runs the other.
-- The four `#[cfg(bundled_model)]` tests are skipped — the same pattern as the
-  client's E2EE integration tests, which run only when `RAINDROP_TEST_SERVER`
-  names a server and the Rust library is built.
+- The four `#[cfg(bundled_model)]` tests skip themselves — the same pattern as
+  the client's E2EE integration tests, which run only when
+  `RAINDROP_TEST_SERVER` names a server.
 
-Those tests are the point of the arrangement: dropping the model in is enough to
-find out whether the shapes this crate assumes are the shapes the model actually
-has, which is the one thing that cannot be checked while the file is absent.
-A model is committed under a **new filename**, never edited in place, the same
-rule the encryption core's byte formats follow.
+Those four are the point of the arrangement: they are what answered the question
+the model card could not, namely whether the shapes this crate pins are the
+shapes the real file has. They are.
 
 ## Tests
 
-`cargo test -p raindrop_video` — 23 tests in `tests/effects.rs`, plus four that
-run only with a model committed, covering the
-frame boundary (stride padding, odd dimensions, refusals), blur (background
-variance drops, foreground variance does not), replacement (the right pixels,
-and the refusals), the mask (centring, soft edges, smoothing, convergence,
-a resolution change), the ladder (each step in order, and that one slow frame
-does not trigger it), colour round-tripping, and determinism.
+`cargo test -p raindrop_video` — 27 tests in `tests/effects.rs`, four of which
+run only with the segmentation model present, plus two unit tests in `blur.rs`.
+They cover the frame boundary (stride padding, odd dimensions, refusals), blur
+(background variance drops, foreground variance does not), replacement (the
+right pixels, and the refusals), the mask (centring, soft edges, smoothing,
+convergence, a resolution change), the ladder (each step in order, and that one
+slow frame does not trigger it), colour round-tripping, and determinism.
+
+The two in `blur.rs` are there because that file has the only arithmetic in the
+crate that is clever rather than obvious. `the_reciprocal_divides_exactly`
+checks the reciprocal multiply against the division it replaces over its
+*entire* input domain — every window a radius can produce, every sum that
+window can hold — and `blocking_the_vertical_pass_changes_nothing` checks the
+cache-blocked pass against a plain column-at-a-time one, including widths that
+leave a short last block.
 
 Two test doubles carry most of it:
 
