@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/raindrop_crypto", "crates/raindrop_crypto_ffi"]
+members = ["crates/raindrop_crypto", "crates/raindrop_crypto_ffi", "crates/raindrop_video"]
 
 [workspace.package]
 edition = "2024"

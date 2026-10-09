@@ -11,7 +11,13 @@ of that same change**, not as a follow-up. If nothing existing fits, add a new f
 `docs/README.md`.
 
 RaindropCrypto is the end-to-end encryption core for Raindrop, a decentralised, self-hosted chat
-platform. It is shared by two other projects, and several of its byte formats are a contract with them:
+platform — **and, since camera video, the client's camera-effects core as well**
+([`docs/video-effects.md`](docs/video-effects.md)). The effects have nothing to do with encryption;
+they live here because they are Rust that has to reach all five of the client's targets, which is
+exactly what this workspace's cargokit build already does, and because the Flutter media library
+exposes no way to touch a camera frame from Dart at all.
+
+It is shared by two other projects, and several of its byte formats are a contract with them:
 
 - [RaindropClient](../RaindropClient/CLAUDE.md) (Flutter) is the only consumer of the code. It compiles
   `raindrop_crypto_ffi` into the app and reaches it through generated Dart bindings.
@@ -65,7 +71,7 @@ runs quick, because the tests run real key derivations.
 
 ## Architecture
 
-A Cargo workspace of two crates under `crates/`:
+A Cargo workspace of three crates under `crates/`:
 
 - **`raindrop_crypto`** — the core, plain Rust, no Flutter. **It does no networking**: it turns
   intentions ("send this", "add these devices") into bytes for the caller to deliver, and delivered
@@ -73,6 +79,12 @@ A Cargo workspace of two crates under `crates/`:
   makes the whole crate testable without a server.
 - **`raindrop_crypto_ffi`** — the flutter_rust_bridge layer (`src/api/`), a thin wrapper over
   `Session`. `src/frb_generated.rs` is generated.
+- **`raindrop_video`** — the camera-effects core: background blur and background replacement, applied
+  to I420 camera frames **in place**, so there is no second track and the frame cryptor never notices.
+  It depends on neither of the others and holds no key material. Its one `unsafe` is `frame.rs`, the
+  borrowed-frame boundary; everything else is safe Rust over slices. Segmentation is behind the
+  `Segmenter` trait, and the only implementation so far is a deterministic test one — see
+  [`docs/video-effects.md`](docs/video-effects.md) and the roadmap.
 
 `raindrop_crypto/src/`:
 
@@ -133,7 +145,8 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 ## Testing
 
-`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments) and 12 integration tests in
+`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments), 22 camera-effects
+tests in `crates/raindrop_video/tests/effects.rs`, and 12 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

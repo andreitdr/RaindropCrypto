@@ -2272,6 +2272,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raindrop_video"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "rand"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

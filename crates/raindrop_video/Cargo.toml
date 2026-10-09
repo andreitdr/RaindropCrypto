@@ -1,0 +1,12 @@
+[package]
+name = "raindrop_video"
+version = "0.1.0"
+description = "Raindrop's camera-effects core: person segmentation, background blur and background replacement, applied to camera frames in place."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror = "2"
+
+[dev-dependencies]

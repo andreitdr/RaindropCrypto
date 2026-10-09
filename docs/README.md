@@ -4,6 +4,10 @@ RaindropCrypto is the end-to-end encryption core of Raindrop, a decentralised, s
 platform. It is Rust, built on **MLS** (RFC 9420) through OpenMLS, and it runs entirely on clients: the
 [server](../../RaindropServer/docs/README.md) never holds a private key and never links this code.
 
+It also carries the client's **camera-effects** core ([Camera effects](video-effects.md)) — unrelated
+to encryption, but Rust that has to reach all five of the client's targets, which is exactly what this
+workspace's build already does.
+
 This wiki documents the feature set as it stands today. Each file covers one area; start with
 [Architecture overview](architecture-overview.md) if you're new to the codebase, and
 [Roadmap](roadmap.md) for what is and is not built yet.
@@ -31,6 +35,7 @@ What binds the three together is not code but byte formats: everything in
 | [Key backup](key-backup.md) | The recovery key, the Argon2id passphrase path, the sealed blob format |
 | [Device linking](device-linking.md) | Moving an identity onto a new device through a server that cannot read or substitute it |
 | [Attachments](attachments.md) | Files: the per-file key, the chunked `raindrop/attachment/v1` format, the length contract with the server |
+| [Camera effects](video-effects.md) | Background blur and background replacement on a call's camera: the I420 frame boundary, the two clocks, the mask, the degradation ladder, the segmentation seam |
 | [Local store](local-store.md) | The SQLCipher database: what it holds, the tables, how it is opened |
 | [Flutter bridge](flutter-bridge.md) | `raindrop_crypto_ffi`, the flat bridge types, error kinds, codegen, the version pin, the build glue |
 | [Wire contracts](wire-contracts.md) | Every byte format the client and server also read, and what has to change together |

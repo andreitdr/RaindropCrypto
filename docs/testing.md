@@ -55,6 +55,22 @@ unit test beside the code it tests.
 **`raindrop_crypto_ffi`** has no tests of its own — it is a thin conversion layer over `Session`, exercised
 by the client's Dart tests instead.
 
+**`raindrop_video` (22, `tests/effects.rs`)** — the camera effects, driven over real frames with real
+stride padding. Full detail in [Camera effects](video-effects.md#tests); what carries them is two test
+doubles worth knowing about:
+
+- **A hand-wound clock** whose every *read* advances it by a set step. `Effects::process` reads it once
+  at the start of a frame and once at the end, so the step is exactly how long that frame appears to
+  have taken — which drives the degradation ladder to any state with no real waiting.
+- **Segmenters that answer in known ways.** The default `CentreOvalSegmenter` is itself one: a real,
+  deterministic segmenter that finds a circle in the middle of the frame. Every assertion is therefore
+  about the pixel work, and a regression shows up as a wrong picture rather than as a worse mask.
+
+The groups: the frame boundary (stride padding untouched, odd dimensions, refusals), blur (background
+variance drops, foreground variance does not), replacement, the mask (centring, soft edges,
+convergence), the ladder (each step in order; one slow frame triggers nothing), colour round-tripping,
+and determinism.
+
 ## Testing from the client
 
 The client (Flutter) has its own tests that exercise this crate through the bridge; see its
