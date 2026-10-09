@@ -9,6 +9,7 @@
 //! `background-size: cover`, so a replacement of any aspect ratio fills the
 //! picture without being stretched.
 
+use crate::Error;
 use crate::convert::rgb_to_yuv;
 
 /// A decoded replacement image, in the caller's colour space.
@@ -18,6 +19,24 @@ pub struct Background {
     pub height: usize,
     /// RGB888, `width * height * 3` bytes.
     pub pixels: Vec<u8>,
+}
+
+impl Background {
+    /// Reads a picture off disk.
+    ///
+    /// Decoding happens here rather than in the caller so the pixels never
+    /// cross the Dart bridge — a 4K photograph would be 24 MB of Dart list.
+    pub fn from_file(path: &str) -> Result<Self, Error> {
+        let image = image::open(path)
+            .map_err(|_| Error::BadBackground("that file could not be read as a picture"))?
+            .to_rgb8();
+
+        Ok(Self {
+            width: image.width() as usize,
+            height: image.height() as usize,
+            pixels: image.into_raw(),
+        })
+    }
 }
 
 /// A replacement image converted to planes at one particular frame size.

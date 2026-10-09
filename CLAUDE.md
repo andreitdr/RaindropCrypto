@@ -62,7 +62,9 @@ flutter_rust_bridge_codegen generate
 
 `flutter_rust_bridge` must be exactly **2.13.0** in three places: this crate's `Cargo.toml`
 (`=2.13.0`), `RaindropClient/pubspec.yaml`, and the installed codegen. `frb_generated.rs` is generated —
-never edit it by hand.
+never edit it by hand, and that includes `cargo fmt`: it reorders three `use` groups in that file
+(edition 2024 sorts `transform_result_dco` differently), so `cargo fmt --all --check` always reports
+it. **Leave it as the codegen wrote it** and check that every other diff it reports is dealt with.
 
 The Flutter app builds `raindrop_crypto_ffi` by itself through `RaindropClient/native/
 raindrop_crypto_builder` (cargokit); there is no separate build step for the app. The first build takes
@@ -78,7 +80,11 @@ A Cargo workspace of three crates under `crates/`:
   bytes into plaintext or state changes. That keeps the delivery service out of the crypto code and
   makes the whole crate testable without a server.
 - **`raindrop_crypto_ffi`** — the flutter_rust_bridge layer (`src/api/`), a thin wrapper over
-  `Session`. `src/frb_generated.rs` is generated.
+  `Session`. `src/frb_generated.rs` is generated. It also carries the camera effects, which have two
+  more surfaces because frames must not cross the bridge: `src/c_api.rs`, one `extern "C"` function
+  Apple's capture pipeline calls by address, and `src/jni_api.rs`, the same for Android, bound by name
+  as `com.raindrop.video.NativeFrameProcessor.processI420` — **a Java class name this workspace owns**
+  and the client declares. See [`docs/video-effects.md`](docs/video-effects.md#the-three-surfaces).
 - **`raindrop_video`** — the camera-effects core: background blur and background replacement, applied
   to I420 camera frames **in place**, so there is no second track and the frame cryptor never notices.
   It depends on neither of the others and holds no key material. Its one `unsafe` is `frame.rs`, the
@@ -150,7 +156,7 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 `cargo test` runs 21 unit tests (store, certificates, backup, link, attachments), 23 camera-effects
 tests in `crates/raindrop_video/tests/effects.rs` (four more run once a segmentation model is
-committed), and 12 integration tests in
+committed), and 13 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

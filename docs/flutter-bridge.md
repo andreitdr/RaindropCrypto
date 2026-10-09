@@ -6,6 +6,13 @@ server can be shared across the isolate's calls (flutter_rust_bridge runs them o
 `crates/raindrop_crypto_ffi/src/api/session.rs` (hand-written) and `src/frb_generated.rs` (generated —
 never edit it).
 
+It also carries the [camera effects](video-effects.md), which are not crypto and not a session: one
+Flutter plugin, one cargokit build and one library for both cores. Those have **three** surfaces rather
+than one, because frames must not cross this bridge — `api/video.rs` over flutter_rust_bridge for
+control, `c_api.rs` as plain C for Apple's capture pipeline, and `jni_api.rs` for Android's. See
+[Camera effects → The three surfaces](video-effects.md#the-three-surfaces); the rest of this file is
+about the encryption core.
+
 ## `CryptoSession`
 
 `#[frb(opaque)] pub struct CryptoSession { inner: Mutex<Session> }` wraps one `raindrop_crypto::Session`.

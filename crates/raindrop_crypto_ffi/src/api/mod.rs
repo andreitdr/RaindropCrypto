@@ -2,6 +2,7 @@
 
 pub mod attachment;
 pub mod session;
+pub mod video;
 
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {

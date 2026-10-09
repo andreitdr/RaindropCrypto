@@ -38,6 +38,78 @@ That matters for three reasons:
 - The published track's identity never changes, so nothing has to be
   renegotiated when an effect is switched on or off mid-call.
 
+## The three surfaces
+
+The effects are reached through `raindrop_crypto_ffi`, the same library the
+encryption core already ships (`Cargo.toml` depends on `raindrop_video`). A
+second library would have meant a second cargokit builder, a second codegen and
+a second `.so` to keep in step, for two crates that have to be in the app
+together anyway.
+
+**`src/api/video.rs` — control, over flutter_rust_bridge.** What Dart calls:
+
+| Function | Does |
+|---|---|
+| `video_effects_capabilities()` | Whether a model is bundled, and which backend. The UI reads this rather than guessing from the platform |
+| `video_effects_process_address()` | The address of the per-frame C function, as an integer |
+| `video_effects_create(config)` | Opens effects, returns a handle. **Refuses with `Unsupported` when no model is bundled** |
+| `video_effects_update(handle, config)` | Changes the effect under a running camera |
+| `video_effects_set_background_file(handle, path)` | Decodes a picture *in Rust*, so a 4K photograph is not 24 MB of Dart list |
+| `video_effects_stats(handle)` | Frames, masks, and whether the ladder has stepped down |
+| `video_effects_destroy(handle)` | Releases the effects and the segmentation thread |
+
+The handle is a plain `u64`, not an frb opaque object, because it has to travel
+through a Dart `int` into platform code that knows nothing about Rust. It
+indexes a `static Mutex<HashMap<u64, Effects>>`, and the per-frame path takes it
+with **`try_lock`, never `lock`**: the capture thread must not block behind a
+configuration change, and a frame left alone for one tick is invisible where a
+stalled camera is not.
+
+**`src/c_api.rs` — the hot path, as plain C.** One `#[unsafe(no_mangle)]`
+function:
+
+```rust
+pub type ProcessI420 = unsafe extern "C" fn(
+    context: i64, y: *mut u8, y_stride: i32, u: *mut u8, u_stride: i32,
+    v: *mut u8, v_stride: i32, width: i32, height: i32) -> i32;
+```
+
+`0` means the frame was processed; every negative value means it was left
+*exactly* as it arrived — `-1` bad dimensions, `-2` a frame
+`I420FrameMut::new` would not accept, `-3` effects busy or the handle gone.
+**A negative return is not an error the caller has to handle**: passing the
+frame on untouched is always the right fallback.
+
+Apple's native side reaches this by address, so it holds no Raindrop symbol and
+links against nothing of this workspace — it would work just as well against
+any other processor.
+
+**`src/jni_api.rs` — the same thing for Android.** Android cannot call an
+address: frames arrive in Java, their planes are `ByteBuffer`s, and only JNI can
+turn one into a pointer. So the symbol is exported from this library and bound
+by name:
+
+```
+com.raindrop.video.NativeFrameProcessor.processI420
+```
+
+**That Java class name is a contract this workspace owns.** It is deliberately
+in a package of its own rather than in the client plugin's, so nothing here
+encodes the client's internals; the client declares the class in that package
+and calls `System.loadLibrary("raindrop_crypto_ffi")`. Changing the name or the
+signature on either side breaks the binding at the first frame, so change both
+together.
+
+Each plane is passed as its buffer **plus an offset**: a cropped or scaled I420
+buffer is a view whose `position()` is not zero, while `GetDirectBufferAddress`
+answers for the whole region. Nothing from the JVM is trusted — a buffer that is
+not direct, or too small for the dimensions claimed, is reported (`-4`) and the
+frame goes through untouched. `with_env` wraps the body in `catch_unwind`, so a
+panic costs one frame rather than the process, and reports `-5`.
+
+This is also why the `jni` dependency is `[target.'cfg(target_os = "android")'
+.dependencies]` — it exists for exactly this one function.
+
 ## The frame
 
 `frame::I420FrameMut` is the crate's **only `unsafe`**. I420 is what every
@@ -200,8 +272,15 @@ there:
 
 - `build.rs` leaves `cfg(bundled_model)` off, so `OnnxSegmenter::bundled` does
   not exist and nothing tries to `include_bytes!` a missing file.
-- `onnx::best()` returns `CentreOvalSegmenter`, so **a build without the model is
-  a build with a weaker effect, not a build without a camera.**
+- `onnx::best()` returns `CentreOvalSegmenter`, so a build without the model is a
+  build with a weaker effect rather than one that cannot composite at all.
+- **The bridge refuses anyway.** `video_effects_create` returns `Unsupported`
+  when `onnx::model_bundled()` is false, and `video_effects_capabilities()`
+  reports `available: false`, so the client offers no effect at all. An oval
+  where a person should be is worse than a plain camera, and the fallback
+  segmenter exists to keep the crate's own tests and the compositing path
+  honest, not to be shipped. That is why the UI asks the native side instead of
+  branching on the platform.
 - `Effects::backend()` says which one is in use, and
   `the_build_says_which_segmenter_it_has` asserts a build never claims one and
   runs the other.

@@ -126,6 +126,20 @@ impl Segmenter for OnnxSegmenter {
     }
 }
 
+/// Whether a segmentation model is compiled into this build.
+///
+/// The UI gates the whole effects picker on this rather than on the platform: a
+/// build without the model would find the wrong shape, and offering an effect
+/// that blurs the wrong thing is worse than not offering it.
+pub fn model_bundled() -> bool {
+    cfg!(bundled_model)
+}
+
+/// What the segmenter in use is called, without constructing one.
+pub fn best_name() -> &'static str {
+    if cfg!(bundled_model) { "onnx" } else { "centre-oval" }
+}
+
 /// The best segmenter this build has.
 ///
 /// The real model when one is committed, and the deterministic fallback

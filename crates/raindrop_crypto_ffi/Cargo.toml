@@ -11,9 +11,21 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 raindrop_crypto = { path = "../raindrop_crypto" }
+# The camera effects ride in the same library rather than a second one: cargokit
+# already builds this crate for all five targets, and a second builder would mean
+# a second codegen, a second podspec set and a second dylib to load for no gain.
+# The two cores share nothing else — raindrop_video holds no key material.
+raindrop_video = { path = "../raindrop_video" }
 # Must match the flutter_rust_bridge version in RaindropClient/pubspec.yaml and the installed
 # flutter_rust_bridge_codegen exactly.
 flutter_rust_bridge = "=2.13.0"
+
+# Android only, and only for the camera effects: a camera frame arrives in Java,
+# and turning its ByteBuffer planes into pointers needs GetDirectBufferAddress.
+# See src/jni_api.rs for why the symbol lives in this library rather than in a
+# second one built by the Flutter plugin.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.22"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

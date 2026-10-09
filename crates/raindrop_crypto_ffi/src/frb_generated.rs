@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 964364491;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -302320025;
 
 // Section: executor
 
@@ -1965,6 +1965,198 @@ fn wire__crate__api__session__safety_number_impl(
         },
     )
 }
+fn wire__crate__api__video__video_effects_capabilities_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_capabilities",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::video::video_effects_capabilities())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_create_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_create",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_config = <crate::api::video::VideoEffectsConfig>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::video::VideoFailure>((move || {
+                    let output_ok = crate::api::video::video_effects_create(api_config)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_destroy_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_destroy",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::video::video_effects_destroy(api_handle);
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_process_address_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_process_address",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::video::video_effects_process_address())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_set_background_file_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_set_background_file",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <u64>::sse_decode(&mut deserializer);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::video::VideoFailure>((move || {
+                    let output_ok = crate::api::video::video_effects_set_background_file(api_handle, api_path)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_stats_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_stats",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <u64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::video::VideoFailure>((move || {
+                    let output_ok = crate::api::video::video_effects_stats(api_handle)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__video__video_effects_update_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "video_effects_update",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+            };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <u64>::sse_decode(&mut deserializer);
+            let api_config = <crate::api::video::VideoEffectsConfig>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::video::VideoFailure>((move || {
+                    let output_ok = crate::api::video::video_effects_update(api_handle, api_config)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 
 // Section: related_funcs
 
@@ -2088,6 +2280,13 @@ impl SseDecode for crate::api::session::ExternalJoin {
             group_id: var_groupId,
             pending: var_pending,
         };
+    }
+}
+
+impl SseDecode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f32::<NativeEndian>().unwrap()
     }
 }
 
@@ -2407,6 +2606,74 @@ impl SseDecode for usize {
     }
 }
 
+impl SseDecode for crate::api::video::VideoEffectsCapabilities {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_available = <bool>::sse_decode(deserializer);
+        let mut var_backend = <String>::sse_decode(deserializer);
+        return crate::api::video::VideoEffectsCapabilities {
+            available: var_available,
+            backend: var_backend,
+        };
+    }
+}
+
+impl SseDecode for crate::api::video::VideoEffectsConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_kind = <i32>::sse_decode(deserializer);
+        let mut var_blurStrength = <f32>::sse_decode(deserializer);
+        let mut var_maskHz = <f32>::sse_decode(deserializer);
+        return crate::api::video::VideoEffectsConfig {
+            kind: var_kind,
+            blur_strength: var_blurStrength,
+            mask_hz: var_maskHz,
+        };
+    }
+}
+
+impl SseDecode for crate::api::video::VideoEffectsStats {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_frames = <u64>::sse_decode(deserializer);
+        let mut var_masks = <u64>::sse_decode(deserializer);
+        let mut var_degraded = <bool>::sse_decode(deserializer);
+        let mut var_degradations = <u32>::sse_decode(deserializer);
+        return crate::api::video::VideoEffectsStats {
+            frames: var_frames,
+            masks: var_masks,
+            degraded: var_degraded,
+            degradations: var_degradations,
+        };
+    }
+}
+
+impl SseDecode for crate::api::video::VideoFailure {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_kind = <crate::api::video::VideoFailureKind>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        return crate::api::video::VideoFailure {
+            kind: var_kind,
+            message: var_message,
+        };
+    }
+}
+
+impl SseDecode for crate::api::video::VideoFailureKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::video::VideoFailureKind::Unsupported,
+            1 => crate::api::video::VideoFailureKind::BadImage,
+            2 => crate::api::video::VideoFailureKind::BadHandle,
+            3 => crate::api::video::VideoFailureKind::Other,
+            _ => unreachable!("Invalid variant for VideoFailureKind: {}", inner),
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -2477,6 +2744,11 @@ fn pde_ffi_dispatcher_primary_impl(
         42 => wire__crate__api__attachment__encrypt_attachment_bytes_impl(port, ptr, rust_vec_len, data_len),
         43 => wire__crate__api__attachment__encrypt_attachment_file_impl(port, ptr, rust_vec_len, data_len),
         44 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__video__video_effects_create_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__video__video_effects_destroy_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__video__video_effects_set_background_file_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__video__video_effects_stats_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__video__video_effects_update_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2492,6 +2764,8 @@ fn pde_ffi_dispatcher_sync_impl(
         38 => wire__crate__api__attachment__attachment_ciphertext_length_impl(ptr, rust_vec_len, data_len),
         39 => wire__crate__api__session__backup_needs_passphrase_impl(ptr, rust_vec_len, data_len),
         45 => wire__crate__api__session__safety_number_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__video__video_effects_capabilities_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__video__video_effects_process_address_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2771,6 +3045,95 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::session::SealedBackup> for cr
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::video::VideoEffectsCapabilities {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.available.into_into_dart().into_dart(),
+            self.backend.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::video::VideoEffectsCapabilities {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoEffectsCapabilities>
+    for crate::api::video::VideoEffectsCapabilities
+{
+    fn into_into_dart(self) -> crate::api::video::VideoEffectsCapabilities {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::video::VideoEffectsConfig {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.kind.into_into_dart().into_dart(),
+            self.blur_strength.into_into_dart().into_dart(),
+            self.mask_hz.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::video::VideoEffectsConfig {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoEffectsConfig>
+    for crate::api::video::VideoEffectsConfig
+{
+    fn into_into_dart(self) -> crate::api::video::VideoEffectsConfig {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::video::VideoEffectsStats {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.frames.into_into_dart().into_dart(),
+            self.masks.into_into_dart().into_dart(),
+            self.degraded.into_into_dart().into_dart(),
+            self.degradations.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::video::VideoEffectsStats {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoEffectsStats> for crate::api::video::VideoEffectsStats {
+    fn into_into_dart(self) -> crate::api::video::VideoEffectsStats {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::video::VideoFailure {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.kind.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::video::VideoFailure {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoFailure> for crate::api::video::VideoFailure {
+    fn into_into_dart(self) -> crate::api::video::VideoFailure {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::video::VideoFailureKind {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Unsupported => 0.into_dart(),
+            Self::BadImage => 1.into_dart(),
+            Self::BadHandle => 2.into_dart(),
+            Self::Other => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::video::VideoFailureKind {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoFailureKind> for crate::api::video::VideoFailureKind {
+    fn into_into_dart(self) -> crate::api::video::VideoFailureKind {
+        self
+    }
+}
 
 impl SseEncode for CryptoSession {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2864,6 +3227,13 @@ impl SseEncode for crate::api::session::ExternalJoin {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<u8>>::sse_encode(self.group_id, serializer);
         <crate::api::session::PendingCommit>::sse_encode(self.pending, serializer);
+    }
+}
+
+impl SseEncode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f32::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -3124,6 +3494,59 @@ impl SseEncode for usize {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u64::<NativeEndian>(self as _).unwrap();
+    }
+}
+
+impl SseEncode for crate::api::video::VideoEffectsCapabilities {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.available, serializer);
+        <String>::sse_encode(self.backend, serializer);
+    }
+}
+
+impl SseEncode for crate::api::video::VideoEffectsConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.kind, serializer);
+        <f32>::sse_encode(self.blur_strength, serializer);
+        <f32>::sse_encode(self.mask_hz, serializer);
+    }
+}
+
+impl SseEncode for crate::api::video::VideoEffectsStats {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u64>::sse_encode(self.frames, serializer);
+        <u64>::sse_encode(self.masks, serializer);
+        <bool>::sse_encode(self.degraded, serializer);
+        <u32>::sse_encode(self.degradations, serializer);
+    }
+}
+
+impl SseEncode for crate::api::video::VideoFailure {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::video::VideoFailureKind>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.message, serializer);
+    }
+}
+
+impl SseEncode for crate::api::video::VideoFailureKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::video::VideoFailureKind::Unsupported => 0,
+                crate::api::video::VideoFailureKind::BadImage => 1,
+                crate::api::video::VideoFailureKind::BadHandle => 2,
+                crate::api::video::VideoFailureKind::Other => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

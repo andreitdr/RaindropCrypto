@@ -16,4 +16,9 @@ thiserror = "2"
 # backend comes in through later, once there is something to measure it against.
 tract-onnx = "0.21"
 
+# Decoding a replacement background, so the pixels never cross the Dart bridge:
+# a 4K photograph would be 24 MB of Dart list otherwise. Default features off —
+# only the formats a person would actually pick as a background.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+
 [dev-dependencies]
