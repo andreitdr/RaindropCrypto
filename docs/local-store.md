@@ -16,7 +16,10 @@ private keys, the MLS group state, the identity keys it has pinned for other use
   then skips its own PBKDF2, which would only slow every open for a key that is already random.
 - The key is only checked when a page is first read, so `open_connection` reads `sqlite_master` right away
   and a wrong key comes back as **`CryptoError::StoreLocked`** rather than a failure somewhere later.
-- Then `journal_mode = WAL`, `foreign_keys = ON`, `secure_delete = ON`, and a 5-second busy timeout.
+- The 5-second busy timeout is set **before** that first read, so a brief lock from another connection
+  waits instead of failing. Only SQLite's "file is not a database" (a wrong key) becomes `StoreLocked`;
+  any other failure (busy, I/O) is `CryptoError::Store` with the detail.
+- Then `journal_mode = WAL`, `foreign_keys = ON`, `secure_delete = ON`.
 - The key type is `StoreKey = Zeroizing<[u8; 32]>`. The **client** keeps the key in the platform
   keystore (`flutter_secure_storage`), never beside the file. This crate never chooses or stores it.
 

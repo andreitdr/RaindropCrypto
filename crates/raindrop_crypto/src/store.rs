@@ -29,18 +29,25 @@ pub(crate) fn open_connection(path: &Path, key: &[u8; 32]) -> Result<Connection>
     let hex = Zeroizing::new(hex_lower(key));
     connection.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex.as_str()))?;
 
+    // Before the first read: another connection (or process) briefly holding the file must make
+    // this wait, not fail.
+    connection.busy_timeout(std::time::Duration::from_secs(5))?;
+
     // The key is only checked when a page is first read. A wrong key surfaces here as "file is not
-    // a database" rather than somewhere later.
+    // a database" rather than somewhere later. Only that error means "locked by the key"; a busy
+    // or I/O failure is reported as what it is, so it is not mistaken for a wrong key.
     connection
         .query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))
-        .map_err(|_| CryptoError::StoreLocked)?;
+        .map_err(|e| match e.sqlite_error_code() {
+            Some(rusqlite::ErrorCode::NotADatabase) => CryptoError::StoreLocked,
+            _ => CryptoError::Store(format!("opening the local store: {e}")),
+        })?;
 
     connection.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA foreign_keys = ON;
          PRAGMA secure_delete = ON;",
     )?;
-    connection.busy_timeout(std::time::Duration::from_secs(5))?;
     Ok(connection)
 }
 
