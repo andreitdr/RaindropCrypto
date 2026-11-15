@@ -33,7 +33,7 @@ const SCALE: f32 = 1.0 / 255.0;
 
 /// A segmenter over one loaded model.
 pub struct OnnxSegmenter {
-    model: TypedRunnableModel<TypedModel>,
+    model: Arc<TypedRunnableModel>,
     input: Tensor,
 }
 
@@ -90,8 +90,11 @@ impl Segmenter for OnnxSegmenter {
             return Err(Error::Segmentation("the input square was the wrong size"));
         }
 
-        let buffer = self
+        let mut view = self
             .input
+            .try_as_plain_ram_mut()
+            .map_err(|_| Error::Segmentation("the input buffer is not in memory"))?;
+        let buffer = view
             .as_slice_mut::<f32>()
             .map_err(|_| Error::Segmentation("the input buffer is the wrong type"))?;
 
@@ -107,7 +110,7 @@ impl Segmenter for OnnxSegmenter {
         let output = outputs
             .first()
             .ok_or(Error::Segmentation("the model returned nothing"))?
-            .to_array_view::<f32>()
+            .to_plain_array_view::<f32>()
             .map_err(|_| Error::Segmentation("the model's output is not confidences"))?;
 
         let confidences = output

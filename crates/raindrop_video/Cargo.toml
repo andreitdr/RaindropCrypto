@@ -14,7 +14,7 @@ thiserror = "2"
 # core (ONNX Runtime, TensorFlow Lite) would need linking solved separately on
 # each. See docs/video-effects.md; `Segmenter` is the seam a faster, accelerated
 # backend comes in through later, once there is something to measure it against.
-tract-onnx = "0.21"
+tract-onnx = "0.23"
 
 # Decoding a replacement background, so the pixels never cross the Dart bridge:
 # a 4K photograph would be 24 MB of Dart list otherwise. Default features off —

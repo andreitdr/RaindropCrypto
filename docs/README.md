@@ -41,6 +41,7 @@ What binds the three together is not code but byte formats: everything in
 | [Flutter bridge](flutter-bridge.md) | `raindrop_crypto_ffi`, the flat bridge types, error kinds, codegen, the version pin, the build glue |
 | [Wire contracts](wire-contracts.md) | Every byte format the client and server also read, and what has to change together |
 | [Testing & building](testing.md) | Toolchain, commands, what the tests cover |
+| [Dependency advisories](dependency-advisories.md) | Known advisories against `Cargo.lock` that no update can fix yet, and why each is still there |
 | [CI & releases](ci-and-releases.md) | The GitHub Actions workflows, and why the client does not use their artefacts |
 | [Roadmap](roadmap.md) | Everything implemented today, everything that is not, and what is deliberately not planned |
 
