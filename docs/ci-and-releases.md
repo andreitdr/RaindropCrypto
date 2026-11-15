@@ -10,13 +10,20 @@ cancels a run still in progress. Both jobs use `dtolnay/rust-toolchain@stable` a
 
 | Job | Does |
 |---|---|
-| `build` | `cargo build --workspace --all-targets --locked` |
+| `build` | `cargo build --workspace --all-targets --locked` on `ubuntu-latest`, `macos-latest` and `windows-latest` (`fail-fast: false`; Windows gets Strawberry Perl, NASM and a short `CARGO_TARGET_DIR` for the vendored OpenSSL) |
 | `test` | after `build`: `cargo test --workspace --locked` |
 
 `--locked` means `Cargo.lock` is authoritative: a dependency bump has to be committed, it cannot
-happen on the runner. Both jobs run on `ubuntu-latest` only — the crate is built for every real
-target by the client's own build (cargokit), so CI's job here is correctness, not coverage of
-platforms. What the tests cover is in [Testing & building](testing.md).
+happen on the runner. `test` runs on `ubuntu-latest` only. Android and iOS are not built here — the
+client's CI compiles this workspace for both through cargokit, with the same lints. What the tests
+cover is in [Testing & building](testing.md).
+
+**Warnings are errors.** `Cargo.toml`'s `[workspace.lints.rust]` sets `warnings = "deny"`, and every
+crate opts in with `[lints] workspace = true`, so a warning fails `cargo build` locally, on every CI
+platform, and inside the client's cargokit build (crates.io dependencies are exempt: cargo caps their
+lints). A failing `build` stops `release.yml`, so **no release is published while any platform has a
+compilation error or a warning**. Fix the warning; do not `#[allow]` it to get a build through unless
+the code is right and the lint is wrong, and then say why in a comment next to the `allow`.
 
 Clippy and `cargo fmt` are **not** run in CI; run them before pushing:
 
@@ -28,7 +35,8 @@ cargo clippy --all-targets && cargo fmt --all
 
 Triggered by a pushed version tag matching `v[0-9]+.[0-9]+.[0-9]+`.
 
-1. **`ci`** — reruns `ci.yml` against the tagged commit.
+1. **`ci`** — reruns `ci.yml` against the tagged commit; any compilation error or warning on any
+   platform stops the release here.
 2. **`package`** — on `ubuntu-latest` and `macos-latest`: `cargo build --release --locked -p
    raindrop_crypto_ffi`, then tars whatever of `libraindrop_crypto_ffi.{so,dylib,a}` exists into
    `RaindropCrypto-<version>-<linux|macos>.tar.gz`.
@@ -53,7 +61,7 @@ tagging) or taken from `--notes-dir DIR/<Repo>.md`. Tagging by hand
 
 - No crates.io publish: both crates are `publish = false`.
 - No Windows or Android artefacts (see [Roadmap](roadmap.md)).
-- No clippy, rustfmt, audit or coverage gate.
+- No clippy, rustfmt, audit or coverage gate (compiler warnings *are* a gate, see above).
 - No PR trigger: `push` to `main` only.
 
 ## Related

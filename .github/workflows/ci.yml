@@ -20,15 +20,51 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Warnings are errors: Cargo.toml's [workspace.lints] denies them, so any warning fails this job, and
+  # through release.yml stops the release. A release is only published when every platform here
+  # compiles. Android and iOS are compiled (with the same lints) by RaindropClient's CI, through cargokit.
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false # one platform failing shouldn't hide the others' results
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest }
+          - { name: macos, os: macos-latest }
+          - { name: windows, os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash # Windows defaults to PowerShell
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      # rusqlite's bundled SQLCipher compiles OpenSSL from source on Windows, which needs a full Perl
+      # and NASM; Git Bash's own cut-down Perl fails OpenSSL's Configure. Same fix as RaindropClient's CI.
+      - name: Windows OpenSSL build tools
+        if: matrix.name == 'windows'
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          distribution: strawberry
+      - name: Install NASM
+        if: matrix.name == 'windows'
+        uses: ilammy/setup-nasm@v1
+      - name: Use Strawberry Perl for OpenSSL
+        if: matrix.name == 'windows'
+        run: |
+          perl_exe="$(ls -d /c/hostedtoolcache/windows/strawberry-perl/*/x64/perl/bin/perl.exe | sort | tail -n 1)"
+          [ -n "$perl_exe" ] || { echo "Strawberry Perl not found" >&2; exit 1; }
+          echo "OPENSSL_SRC_PERL=$(cygpath -m "$perl_exe")" >> "$GITHUB_ENV"
+          echo "STRAWBERRY_PERL_BIN=$(dirname "$perl_exe")" >> "$GITHUB_ENV"
+          # OpenSSL's build tree is deep; keep it under the 260-character path limit.
+          echo "CARGO_TARGET_DIR=C:/t" >> "$GITHUB_ENV"
+
       - name: Compile
-        run: cargo build --workspace --all-targets --locked
+        run: |
+          if [ -n "${STRAWBERRY_PERL_BIN:-}" ]; then export PATH="$STRAWBERRY_PERL_BIN:$PATH"; fi
+          cargo build --workspace --all-targets --locked
 
   test:
     name: Test

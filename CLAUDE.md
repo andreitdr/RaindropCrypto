@@ -71,6 +71,18 @@ raindrop_crypto_builder` (cargokit); there is no separate build step for the app
 a few minutes, mostly SQLCipher and OpenMLS. `[profile.dev.package."*"] opt-level = 2` keeps debug test
 runs quick, because the tests run real key derivations.
 
+## Warnings are errors; no release with either
+
+**A release cannot be published while any platform has a compilation error, and every warning is an
+error.** `Cargo.toml`'s `[workspace.lints.rust]` denies `warnings` for every crate (each has
+`[lints] workspace = true`; a new crate must too), so a warning fails `cargo build` here, in CI on
+Linux, macOS and Windows, and in the client's cargokit build for Android and iOS — and a failing CI
+stops `release.yml` before anything is published. When you see a warning, fix it in the same change;
+never ship around it with `#[allow(...)]` or by loosening the lint. An `allow` is only for a lint that is
+wrong about correct code, scoped to the item, with a comment saying why. Code behind
+`cfg(target_os = ...)` is only compiled on that platform, so check it there (or in CI) before calling
+it clean. See [`docs/ci-and-releases.md`](docs/ci-and-releases.md).
+
 ## Architecture
 
 A Cargo workspace of three crates under `crates/`:

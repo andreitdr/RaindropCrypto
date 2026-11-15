@@ -7,6 +7,14 @@ edition = "2024"
 license = "UNLICENSED"
 publish = false
 
+# Warnings are errors: a release cannot be published while any crate warns, on any platform. Every
+# crate opts in with `[lints] workspace = true`, so this also holds when RaindropClient compiles the
+# FFI crate through cargokit (dependencies from crates.io are exempt; cargo caps their lints).
+[workspace.lints.rust]
+warnings = "deny"
+# frb_expand is set by flutter_rust_bridge_codegen while it expands the bridge macros.
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(frb_expand)'] }
+
 # Crypto code is slow and hard to profile unoptimised; the tests exercise real key derivations.
 [profile.dev.package."*"]
 opt-level = 2
