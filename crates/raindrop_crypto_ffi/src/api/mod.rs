@@ -1,6 +1,7 @@
 //! Everything under this module is exposed to Dart by flutter_rust_bridge_codegen.
 
 pub mod attachment;
+pub mod identity;
 pub mod session;
 pub mod video;
 

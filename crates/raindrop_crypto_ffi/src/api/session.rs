@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
 use flutter_rust_bridge::frb;
-use raindrop_crypto::backup::{self, PassphraseCost, RecoveryKey};
+use raindrop_crypto::backup::{self, BackedUpPin, PassphraseCost, RecoveryKey};
+use raindrop_crypto::root::RootSecret;
 use raindrop_crypto::{CryptoError, Incoming, Session};
 
 /// What kind of failure a [`CryptoFailure`] is. Dart shows different things for each: a changed
@@ -235,6 +236,54 @@ impl CryptoSession {
 
     pub fn create_identity(&self, user_id: String, device_id: String) -> Result<DeviceIdentity> {
         Ok(self.session().create_identity(&user_id, &device_id)?.into())
+    }
+
+    /// This device's identity on the server whose identity key is `server_key`, derived from the
+    /// person's root secret. `user_id` in the result is the account to register or sign in to.
+    pub fn create_identity_from_root(
+        &self,
+        root: Vec<u8>,
+        server_key: Vec<u8>,
+        device_id: String,
+    ) -> Result<DeviceIdentity> {
+        let root = RootSecret::from_bytes(&root)?;
+        Ok(self
+            .session()
+            .create_identity_from_root(&root, &server_key, &device_id)?
+            .into())
+    }
+
+    /// Signs the server's sign-in challenge (its identity key and nonce) with this device's key.
+    pub fn sign_auth_challenge(&self, server_key: Vec<u8>, nonce: Vec<u8>) -> Result<Vec<u8>> {
+        Ok(self.session().sign_auth_challenge(&server_key, &nonce)?)
+    }
+
+    /// Every pinned identity, for the vault. `first_seen_unix` is not carried and comes back 0.
+    pub fn export_pins(&self) -> Result<Vec<PinnedIdentity>> {
+        Ok(self
+            .session()
+            .export_pins()?
+            .into_iter()
+            .map(|p| PinnedIdentity {
+                user_id: p.user_id.clone(),
+                identity_key: p.identity_key.clone(),
+                verified: p.verified,
+                first_seen_unix: 0,
+            })
+            .collect())
+    }
+
+    /// Takes pins from the vault; a user this device has already pinned is left as it is.
+    pub fn import_pins(&self, pins: Vec<PinnedIdentity>) -> Result<()> {
+        let pins: Vec<BackedUpPin> = pins
+            .into_iter()
+            .map(|p| BackedUpPin {
+                user_id: p.user_id,
+                identity_key: p.identity_key,
+                verified: p.verified,
+            })
+            .collect();
+        Ok(self.session().import_pins(&pins)?)
     }
 
     pub fn restore_identity_with_recovery_key(

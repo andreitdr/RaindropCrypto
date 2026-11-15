@@ -5,6 +5,8 @@
 //! - [`validation`]: who a group member really is (a trait, so plugins can add rules).
 //! - [`attachment`]: the chunked format files are encrypted in before they are uploaded.
 //! - [`backup`]: the recovery-key / passphrase sealed key backup.
+//! - [`root`]: the client's one root secret, the per-server accounts derived from it, the vault.
+//! - [`pairing`]: handing the root to a new device of the same person.
 //! - [`store`]: the SQLCipher-encrypted local database, including the decrypted message cache.
 //!
 //! Nothing here touches the network; see the `session` module docs for how commits flow.
@@ -14,8 +16,10 @@ pub mod backup;
 pub mod error;
 pub mod identity;
 pub mod link;
+pub mod pairing;
 pub mod provider;
 mod random;
+pub mod root;
 pub mod session;
 pub mod store;
 pub mod validation;

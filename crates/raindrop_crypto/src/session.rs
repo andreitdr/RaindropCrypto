@@ -26,6 +26,7 @@ use crate::error::{CryptoError, Result, mls};
 use crate::identity::{DeviceCertificate, UserIdentity};
 use crate::link;
 use crate::provider::RaindropProvider;
+use crate::root::RootSecret;
 use crate::store::{CachedMessage, PinnedIdentity, Store};
 use crate::validation::{CredentialValidator, PinnedIdentityValidator};
 
@@ -51,6 +52,10 @@ const META_LINK_EXCHANGE_SECRET: &str = "link.exchange_secret";
 
 /// Prefixed to the server's nonce before signing, so the signature is good for nothing else.
 const SESSION_BINDING_CONTEXT: &[u8] = b"raindrop/session-binding/v1\n";
+
+/// Prefixed to the server's identity key and its nonce before a device signs them to sign in, so the
+/// signature is good for that server and nothing else.
+const AUTH_CONTEXT: &[u8] = b"raindrop/auth/v1\n";
 
 /// Prefixed to a message's canonical encoding before its sender's device signs it (see
 /// `sign_message_attestation`), so an attestation is never mistaken for any other signature.
@@ -155,6 +160,52 @@ impl Session {
         self.install_identity(UserIdentity::generate(), user_id, device_id)
     }
 
+    /// This device's identity on the server whose identity key is `server_key`, derived from the
+    /// person's root secret: the account id and identity key are the ones every other device of
+    /// theirs derives, the device key is new, and the device certifies itself. Returns the identity
+    /// to register; `user_id` in it is the account to sign in to.
+    pub fn create_identity_from_root(
+        &mut self,
+        root: &RootSecret,
+        server_key: &[u8],
+        device_id: &str,
+    ) -> Result<DeviceIdentity> {
+        let account = root.account(server_key)?;
+        self.install_identity(account.identity, &account.user_id, device_id)
+    }
+
+    /// Every identity key this device has pinned, for the person's vault: trust decisions made on
+    /// one device follow them to the next.
+    pub fn export_pins(&self) -> Result<Vec<BackedUpPin>> {
+        Ok(self
+            .store
+            .pinned_identities()?
+            .into_iter()
+            .map(|p: PinnedIdentity| BackedUpPin {
+                user_id: p.user_id,
+                identity_key: p.identity_key,
+                verified: p.verified,
+            })
+            .collect())
+    }
+
+    /// Takes pins from the vault. Only users this device has not met are added: a pin made here is
+    /// never overwritten by one that came from somewhere else, so a vault can add trust but cannot
+    /// swap a key this device already holds.
+    pub fn import_pins(&self, pins: &[BackedUpPin]) -> Result<()> {
+        let now = now_unix();
+        for pin in pins {
+            if self.store.pinned_identity(&pin.user_id)?.is_some() {
+                continue;
+            }
+            self.store.replace_identity(&pin.user_id, &pin.identity_key, now)?;
+            if pin.verified {
+                self.store.mark_verified(&pin.user_id, &pin.identity_key)?;
+            }
+        }
+        Ok(())
+    }
+
     /// A new device for a user restored from their backup. Keeps the user's identity key (so peers'
     /// safety numbers do not change) and the pins they had made; the device key is new.
     pub fn restore_identity(&mut self, backup: &BackupContents, device_id: &str) -> Result<DeviceIdentity> {
@@ -236,6 +287,21 @@ impl Session {
     pub fn sign_session_challenge(&self, nonce: &[u8]) -> Result<Vec<u8>> {
         let device = self.require_device()?;
         let mut payload = SESSION_BINDING_CONTEXT.to_vec();
+        payload.extend_from_slice(nonce);
+        device.signer.sign(&payload).map_err(mls)
+    }
+
+    /// Signs the server's sign-in challenge with this device's key. There is no password: holding
+    /// a device key the account's identity key has certified *is* the credential. The server's own
+    /// identity key is signed along with its nonce, so a challenge relayed from another server
+    /// produces a signature that server cannot use.
+    pub fn sign_auth_challenge(&self, server_key: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
+        let device = self.require_device()?;
+        let length = u16::try_from(server_key.len())
+            .map_err(|_| CryptoError::Malformed("server identity key is too long".into()))?;
+        let mut payload = AUTH_CONTEXT.to_vec();
+        payload.extend_from_slice(&length.to_be_bytes());
+        payload.extend_from_slice(server_key);
         payload.extend_from_slice(nonce);
         device.signer.sign(&payload).map_err(mls)
     }

@@ -408,3 +408,132 @@ fn a_message_attestation_is_ed25519_by_the_device_key_over_its_context() {
             .is_err()
     );
 }
+
+// ── The root identity ────────────────────────────────────────────────────────────────────────────
+
+const SERVER_KEY: [u8; 65] = [4; 65];
+
+#[test]
+fn two_devices_with_the_same_root_are_the_same_user_and_can_talk() {
+    use raindrop_crypto::root::RootSecret;
+
+    let root = RootSecret::generate();
+    let mut phone = Device::blank(31);
+    let mut laptop = Device::blank(32);
+    let phone_identity = phone
+        .session
+        .create_identity_from_root(&root, &SERVER_KEY, "phone")
+        .unwrap();
+    // The laptop was paired: it holds the same root and nothing else from the phone.
+    let laptop_identity = laptop
+        .session
+        .create_identity_from_root(&RootSecret::from_bytes(root.as_bytes()).unwrap(), &SERVER_KEY, "laptop")
+        .unwrap();
+
+    assert_eq!(phone_identity.user_id, laptop_identity.user_id);
+    assert_eq!(phone_identity.user_identity_key, laptop_identity.user_identity_key);
+    assert_ne!(phone_identity.device_signature_key, laptop_identity.device_signature_key);
+
+    // Each certified itself, and the other accepts it as the same pinned user.
+    phone.session.create_group(CHANNEL).unwrap();
+    let pending = phone.session.add_members(CHANNEL, &[laptop.key_package()]).unwrap();
+    phone.session.merge_pending_commit(CHANNEL).unwrap();
+    laptop.session.join_from_welcome(&pending.welcome.unwrap()).unwrap();
+
+    let ciphertext = phone.session.encrypt(CHANNEL, b"from the phone").unwrap();
+    match laptop.session.process(&ciphertext).unwrap().1 {
+        Incoming::Application { sender, payload, .. } => {
+            assert_eq!(sender.device_id, "phone");
+            assert_eq!(payload, b"from the phone");
+        }
+        other => panic!("expected a message, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_sign_in_signature_is_bound_to_the_server_and_the_nonce() {
+    use ed25519_dalek::{Signature, VerifyingKey};
+    use raindrop_crypto::root::RootSecret;
+
+    let mut device = Device::blank(33);
+    let identity = device
+        .session
+        .create_identity_from_root(&RootSecret::generate(), &SERVER_KEY, "phone")
+        .unwrap();
+    let signature = device.session.sign_auth_challenge(&SERVER_KEY, b"nonce-1").unwrap();
+
+    let key = VerifyingKey::from_bytes(identity.device_signature_key.as_slice().try_into().unwrap()).unwrap();
+    let signature = Signature::from_slice(&signature).unwrap();
+    let payload = |server: &[u8], nonce: &[u8]| {
+        let mut out = b"raindrop/auth/v1\n".to_vec();
+        out.extend_from_slice(&(server.len() as u16).to_be_bytes());
+        out.extend_from_slice(server);
+        out.extend_from_slice(nonce);
+        out
+    };
+    key.verify_strict(&payload(&SERVER_KEY, b"nonce-1"), &signature).unwrap();
+    assert!(key.verify_strict(&payload(&SERVER_KEY, b"nonce-2"), &signature).is_err());
+    assert!(key.verify_strict(&payload(&[5; 65], b"nonce-1"), &signature).is_err());
+}
+
+#[test]
+fn pins_from_the_vault_add_trust_but_never_replace_a_key() {
+    use raindrop_crypto::backup::BackedUpPin;
+
+    let alice = Device::new("alice", "a1", 34);
+    let now = 1_700_000_000;
+    alice.session.store().replace_identity("bob", &[1; 32], now).unwrap();
+
+    alice
+        .session
+        .import_pins(&[
+            BackedUpPin {
+                user_id: "bob".into(),
+                identity_key: vec![2; 32],
+                verified: true,
+            },
+            BackedUpPin {
+                user_id: "carol".into(),
+                identity_key: vec![3; 32],
+                verified: true,
+            },
+        ])
+        .unwrap();
+
+    let bob = alice.session.store().pinned_identity("bob").unwrap().unwrap();
+    assert_eq!(bob.identity_key, vec![1; 32]);
+    assert!(!bob.verified);
+    let carol = alice.session.store().pinned_identity("carol").unwrap().unwrap();
+    assert!(carol.verified);
+    assert!(alice.session.export_pins().unwrap().iter().any(|p| p.user_id == "carol"));
+}
+
+/// Writes the fixture `RaindropServer.Tests/Fixtures/auth_signature.hex` checks the server's sign-in
+/// verifier against: `certificate_len: u16 | certificate | nonce: 32 | signature: 64`, for the server
+/// key `0x04` followed by 64 bytes of `7`. Run with `cargo test -- --ignored print_auth_fixture --nocapture`.
+#[test]
+#[ignore]
+fn print_auth_fixture() {
+    use raindrop_crypto::root::RootSecret;
+
+    let mut server_key = vec![4u8];
+    server_key.extend_from_slice(&[7; 64]);
+    let nonce = [0x5a; 32];
+
+    let mut device = Device::blank(40);
+    let identity = device
+        .session
+        .create_identity_from_root(
+            &RootSecret::from_bytes(&[9; 32]).unwrap(),
+            &server_key,
+            "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        )
+        .unwrap();
+    let signature = device.session.sign_auth_challenge(&server_key, &nonce).unwrap();
+
+    let mut out = (identity.certificate.len() as u16).to_be_bytes().to_vec();
+    out.extend_from_slice(&identity.certificate);
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&signature);
+    println!("FIXTURE {}", out.iter().map(|b| format!("{b:02x}")).collect::<String>());
+}

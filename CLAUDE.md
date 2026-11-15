@@ -106,6 +106,8 @@ A Cargo workspace of three crates under `crates/`:
 | `validation.rs` | `CredentialValidator` (trait) and `PinnedIdentityValidator`, the default |
 | `attachment.rs` | Files: the per-file key and the chunked `raindrop/attachment/v1` format (XChaCha20-Poly1305 STREAM), whose length formula the server relies on |
 | `backup.rs` | `RecoveryKey` (24 BIP-39 words), the Argon2id passphrase path, the sealed blob format |
+| `root.rs` | `RootSecret` and the per-server account derived from it, `RecoverySeed`, the sealed root and vault, the app PIN lock |
+| `pairing.rs` | Pairing a new device: `Offer`, the pairing-code `commitment`, the sealed approval carrying the root |
 | `link.rs` | Device linking: `Offer`, the link-code `commitment`, the X25519 + HKDF + XChaCha20-Poly1305 approval |
 | `store.rs` | `Store`: the SQLCipher-encrypted local database (own keys, identity pins, decrypted message cache) |
 | `provider.rs` | `RaindropProvider`: the OpenMLS provider (RustCrypto primitives, SQLite storage in the same file) |
@@ -156,9 +158,9 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 ## Testing
 
-`cargo test` runs 21 unit tests (store, certificates, backup, link, attachments), 27 camera-effects
+`cargo test` runs 31 unit tests (store, certificates, backup, link, root, pairing, attachments), 27 camera-effects
 tests in `crates/raindrop_video/tests/effects.rs` (four of them only with the segmentation model
-present) plus two in `blur.rs` over its reciprocal division, and 13 integration tests in
+present) plus two in `blur.rs` over its reciprocal division, and 16 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

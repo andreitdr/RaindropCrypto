@@ -23,7 +23,7 @@ debug build without it would make `cargo test` noticeably slower.
 
 ## What `cargo test` covers
 
-**`raindrop_crypto`, unit tests (21)** — one `#[cfg(test)] mod tests` per module:
+**`raindrop_crypto`, unit tests (31)** — one `#[cfg(test)] mod tests` per module:
 
 | Module | Covers |
 |---|---|

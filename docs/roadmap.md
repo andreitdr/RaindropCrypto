@@ -27,13 +27,14 @@ until the client drives it and the server carries it:
 | Call keys | `export_secret`, which the client turns into SFrame media keys for a voice channel's call | [Groups & messages](groups-and-messages.md) |
 | Key backup | 24-word recovery key, or a passphrase via Argon2id; sealed blob the server stores and cannot read; `backup_needs_passphrase` | [Key backup](key-backup.md) |
 | Device linking | `begin_device_link` / `approve_device_link` / `complete_device_link`: X25519 + HKDF + XChaCha20-Poly1305, bound to the link code's commitment so the server cannot substitute keys | [Device linking](device-linking.md) |
+| Root identity | `RootSecret` and the per-server account derived from it, `create_identity_from_root`, the `sign_auth_challenge` sign-in signature, `RecoverySeed` (lookup id, sealed root), the per-server sealed vault, pin export/import, the Argon2id app PIN lock, and `pairing` (offer, commitment, sealed approval). In use by the server and the client | [Root identity](root-identity.md) |
 | Files | The chunked `raindrop/attachment/v1` format, per-file keys, file-to-file and in-memory paths, `ciphertext_length` as the exact contract the server enforces sizes with | [Attachments](attachments.md) |
 | Local store | SQLCipher (CommonCrypto on Apple targets, vendored OpenSSL elsewhere), holding keys, pins, OpenMLS state and the message cache | [Local store](local-store.md) |
 | Flutter bridge | `raindrop_crypto_ffi` over flutter_rust_bridge 2.13.0, flat bridge types with a `kind` enum (no `freezed`, no `build_runner`), `CryptoFailureKind` error mapping | [Flutter bridge](flutter-bridge.md) |
 | Tests | Unit tests plus multi-device integration scenarios: adds, external joins, removals, commit races, restarts, restore from backup, an impostor refused | [Testing & building](testing.md) |
 | CI | Build + test on every push to `main`, release libraries packaged on a version tag | [CI & releases](ci-and-releases.md) |
 
-Everything above is in use end to end today: the client drives each channel's group through the
+Everything above is in use end to end today, except device linking and the per-server key backup, which the root identity replaced and nothing calls any more: the client drives each channel's group through the
 server's delivery service, so encrypted text messages and encrypted calls reach users. See
 [RaindropClient's crypto doc](../../RaindropClient/docs/crypto.md).
 

@@ -58,6 +58,10 @@ impl RecoveryKey {
         Self(random::bytes::<32>())
     }
 
+    pub(crate) fn secret(&self) -> &[u8; 32] {
+        &self.0
+    }
+
     pub fn to_words(&self) -> String {
         bip39::Mnemonic::from_entropy(self.0.as_slice())
             .expect("32 bytes is a valid BIP-39 entropy length")

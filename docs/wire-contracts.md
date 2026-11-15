@@ -42,6 +42,24 @@ server issues the nonce (`POST /api/e2ee/session/challenge`, 32 bytes, 2 minutes
 the signature against the device key in the stored certificate
 (`POST /api/e2ee/session/bind`). See [Identity & trust](identity-and-trust.md#session-binding).
 
+## Sign-in signature
+
+Context string `"raindrop/auth/v1\n"`, then the server's identity key length-prefixed (`u16` big-endian),
+then the server's challenge nonce; the device signs the whole with its device key
+(`Session::sign_auth_challenge`). Plain Ed25519. The server must build the same bytes from **its own**
+identity key, exactly as it publishes it in `GetServerInfo`, and its own nonce
+(`RaindropServer/E2ee/DeviceAuthService.SignedBytes`). The server's test suite verifies a fixture this crate writes
+(`print_auth_fixture` in `tests/session.rs` → `RaindropServer.Tests/Fixtures/auth_signature.hex`), so a
+change to either side fails there; regenerate the fixture when the format changes on purpose.
+
+**If this changes:** update `session.rs`, the server's verifier, and both docs.
+
+## Sealed root, vault and pairing blobs
+
+Defined in `root.rs` and `pairing.rs`; layouts in [Root identity](root-identity.md#sealed-formats). The
+server stores and relays them as opaque bytes and never parses them. The sealed root is stored under
+`RecoverySeed::lookup_id` (32 lowercase hex characters), which the server treats as an opaque name.
+
 ## Message attestation
 
 A device signs every message it sends so a recipient can later prove to moderators who wrote it

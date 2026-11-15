@@ -34,6 +34,7 @@ What binds the three together is not code but byte formats: everything in
 | [Groups & messages](groups-and-messages.md) | MLS groups, key packages, commits and epochs, joining, encrypting and receiving, the message cache, exported secrets |
 | [Key backup](key-backup.md) | The recovery key, the Argon2id passphrase path, the sealed blob format |
 | [Device linking](device-linking.md) | Moving an identity onto a new device through a server that cannot read or substitute it |
+| [Root identity, vault & pairing](root-identity.md) | The one root secret, per-server accounts derived from it, passwordless sign-in signatures, the recovery seed, the vault, the app PIN, pairing a device |
 | [Attachments](attachments.md) | Files: the per-file key, the chunked `raindrop/attachment/v1` format, the length contract with the server |
 | [Camera effects](video-effects.md) | Background blur and background replacement on a call's camera: the I420 frame boundary, the two clocks, the mask, the degradation ladder, the segmentation seam |
 | [Local store](local-store.md) | The SQLCipher database: what it holds, the tables, how it is opened |
