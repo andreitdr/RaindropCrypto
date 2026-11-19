@@ -172,7 +172,7 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 `cargo test` runs 31 unit tests (store, certificates, backup, link, root, pairing, attachments), 27 camera-effects
 tests in `crates/raindrop_video/tests/effects.rs` (four of them only with the segmentation model
-present) plus two in `blur.rs` over its reciprocal division, and 16 integration tests in
+present) plus two in `blur.rs` over its reciprocal division, and 18 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

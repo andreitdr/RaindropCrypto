@@ -253,6 +253,22 @@ impl CryptoSession {
             .into())
     }
 
+    /// As [`CryptoSession::create_identity_from_root`], certified for `user_id` rather than the id
+    /// the root derives: an account the server's owner let this identity reclaim keeps its old id.
+    pub fn create_identity_from_root_for(
+        &self,
+        root: Vec<u8>,
+        server_key: Vec<u8>,
+        user_id: String,
+        device_id: String,
+    ) -> Result<DeviceIdentity> {
+        let root = RootSecret::from_bytes(&root)?;
+        Ok(self
+            .session()
+            .create_identity_from_root_for(&root, &server_key, &user_id, &device_id)?
+            .into())
+    }
+
     /// Signs the server's sign-in challenge (its identity key and nonce) with this device's key.
     pub fn sign_auth_challenge(&self, server_key: Vec<u8>, nonce: Vec<u8>) -> Result<Vec<u8>> {
         Ok(self.session().sign_auth_challenge(&server_key, &nonce)?)

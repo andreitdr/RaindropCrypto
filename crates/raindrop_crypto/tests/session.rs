@@ -451,6 +451,39 @@ fn two_devices_with_the_same_root_are_the_same_user_and_can_talk() {
 }
 
 #[test]
+fn a_reclaimed_account_keeps_its_id_and_the_roots_identity_key() {
+    use raindrop_crypto::root::RootSecret;
+
+    let root = RootSecret::generate();
+    let mut phone = Device::blank(34);
+    let mut laptop = Device::blank(35);
+    let derived = phone
+        .session
+        .create_identity_from_root(&root, &SERVER_KEY, "phone")
+        .unwrap();
+    let reclaimed = laptop
+        .session
+        .create_identity_from_root_for(
+            &RootSecret::from_bytes(root.as_bytes()).unwrap(),
+            &SERVER_KEY,
+            "0f8fad5b-d9cb-469f-a165-70867728950e",
+            "laptop",
+        )
+        .unwrap();
+
+    // The id is the one given; the identity key is the one every device of this root derives.
+    assert_eq!(reclaimed.user_id, "0f8fad5b-d9cb-469f-a165-70867728950e");
+    assert_ne!(reclaimed.user_id, derived.user_id);
+    assert_eq!(reclaimed.user_identity_key, derived.user_identity_key);
+
+    let mut empty = Device::blank(36);
+    assert!(empty
+        .session
+        .create_identity_from_root_for(&root, &SERVER_KEY, "", "tablet")
+        .is_err());
+}
+
+#[test]
 fn a_sign_in_signature_is_bound_to_the_server_and_the_nonce() {
     use ed25519_dalek::{Signature, VerifyingKey};
     use raindrop_crypto::root::RootSecret;

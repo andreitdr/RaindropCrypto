@@ -174,6 +174,24 @@ impl Session {
         self.install_identity(account.identity, &account.user_id, device_id)
     }
 
+    /// As [`Session::create_identity_from_root`], for an account whose id is not the one the root
+    /// derives: one the server's owner let a new identity reclaim, which keeps its old id. The
+    /// identity key is still the root's for this server, so every device of the person certifies
+    /// itself the same way; only the id it is certified for comes from outside.
+    pub fn create_identity_from_root_for(
+        &mut self,
+        root: &RootSecret,
+        server_key: &[u8],
+        user_id: &str,
+        device_id: &str,
+    ) -> Result<DeviceIdentity> {
+        if user_id.is_empty() {
+            return Err(CryptoError::Store("an account id is needed".into()));
+        }
+        let account = root.account(server_key)?;
+        self.install_identity(account.identity, user_id, device_id)
+    }
+
     /// Every identity key this device has pinned, for the person's vault: trust decisions made on
     /// one device follow them to the next.
     pub fn export_pins(&self) -> Result<Vec<BackedUpPin>> {

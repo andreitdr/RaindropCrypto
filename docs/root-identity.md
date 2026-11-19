@@ -3,8 +3,8 @@
 One person, one identity, on every device they pair and every server they join — with no central
 service and without any two servers being able to tell their accounts belong to the same person.
 
-Code: `root.rs`, `pairing.rs`, and three `Session` methods (`create_identity_from_root`,
-`sign_auth_challenge`, `export_pins` / `import_pins`). Bridge: `api/identity.rs`.
+Code: `root.rs`, `pairing.rs`, and four `Session` methods (`create_identity_from_root` and
+`create_identity_from_root_for`, `sign_auth_challenge`, `export_pins` / `import_pins`). Bridge: `api/identity.rs`.
 
 > **Status.** The core, its bridge functions and its tests are in place, and the server accepts the
 > sign-in signature and stores and relays the blobs (`RaindropServer/docs/e2ee.md`). The client is built on it
@@ -39,6 +39,13 @@ What follows from that:
   derivation changes and the old account is unreachable from the root alone.
 
 Device signature keys are still random and per device per server; only the user identity key is derived.
+
+**An account taken over with a claim code keeps its old id.** When everything is lost, the server's
+owner can let a person's *new* identity take their account over (the server's `reclaim`; see its
+`docs/e2ee.md`). That account's id is not the one the new root derives, so
+`Session::create_identity_from_root_for(root, server_key, user_id, device_id)` certifies a device for a
+given id with the identity key the root derives for that server. Every other device of the person does
+the same; the client carries the id in the vault (`accountId`), since it cannot be derived.
 
 ## Signing in
 
