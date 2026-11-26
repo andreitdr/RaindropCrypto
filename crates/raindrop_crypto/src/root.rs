@@ -197,8 +197,14 @@ pub fn open_with_pin(blob: &[u8], pin: &str) -> Result<Zeroizing<Vec<u8>>> {
         parallelism: read_u32(13),
     };
     // The blob is read from disk, so treat the cost as untrusted: nothing weaker than this code
-    // would write, nothing large enough to exhaust the device.
-    if cost.memory_kib < 19 * 1024 || cost.memory_kib > 1024 * 1024 || cost.iterations == 0 || cost.iterations > 20 {
+    // would write, nothing large enough to exhaust a phone (the default writes 64 MiB and 3 passes).
+    if cost.memory_kib < 19 * 1024
+        || cost.memory_kib > 512 * 1024
+        || cost.iterations == 0
+        || cost.iterations > 10
+        || cost.parallelism == 0
+        || cost.parallelism > 8
+    {
         return Err(CryptoError::Malformed("PIN lock cost is out of range".into()));
     }
     let key = stretch(pin, &blob[17..33], cost)?;
@@ -387,5 +393,28 @@ mod tests {
         weakened[12] ^= 1;
         assert!(open_with_pin(&weakened, "4821").is_err());
         assert!(open_with_pin(&blob[..20], "4821").is_err());
+    }
+
+    #[test]
+    fn a_pin_lock_cost_out_of_range_is_refused_before_hashing() {
+        // The header is read before it is authenticated, so each cost field is checked on its
+        // own: memory (offset 5), iterations (9) and parallelism (13) just outside their limits.
+        let blob = seal_with_pin(b"root", "4821", TEST_COST).unwrap();
+        let cases: [(usize, u32); 6] = [
+            (5, 512 * 1024 + 1),
+            (5, 19 * 1024 - 1),
+            (9, 0),
+            (9, 11),
+            (13, 0),
+            (13, 9),
+        ];
+        for (at, value) in cases {
+            let mut forged = blob.clone();
+            forged[at..at + 4].copy_from_slice(&value.to_be_bytes());
+            assert!(
+                matches!(open_with_pin(&forged, "4821"), Err(CryptoError::Malformed(_))),
+                "field at offset {at} set to {value} was not refused as malformed"
+            );
+        }
     }
 }

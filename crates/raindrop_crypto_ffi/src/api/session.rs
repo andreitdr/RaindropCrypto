@@ -24,6 +24,9 @@ pub enum CryptoFailureKind {
     Verification,
     NotFound,
     Malformed,
+    /// The server delivered a commit claiming to be this device's own that it does not hold: the
+    /// local group has fallen off the server's. Delete the group and rejoin it.
+    ResyncRequired,
     Other,
 }
 
@@ -35,21 +38,44 @@ pub struct CryptoFailure {
     pub message: String,
     /// For [`CryptoFailureKind::IdentityChanged`]: whose key changed.
     pub user_id: Option<String>,
+    /// For [`CryptoFailureKind::IdentityChanged`]: the key this device has pinned for them, if any.
+    pub pinned_key: Option<Vec<u8>>,
+    /// For [`CryptoFailureKind::IdentityChanged`]: the key they presented, which
+    /// `accept_changed_identity` takes to accept the change.
+    pub presented_key: Option<Vec<u8>>,
 }
 
 impl From<CryptoError> for CryptoFailure {
     fn from(error: CryptoError) -> Self {
         let message = error.to_string();
-        let (kind, user_id) = match error {
-            CryptoError::StoreLocked => (CryptoFailureKind::StoreLocked, None),
-            CryptoError::IdentityChanged { user_id } => (CryptoFailureKind::IdentityChanged, Some(user_id)),
-            CryptoError::BackupLocked => (CryptoFailureKind::BackupLocked, None),
-            CryptoError::Verification(_) => (CryptoFailureKind::Verification, None),
-            CryptoError::NotFound(_) => (CryptoFailureKind::NotFound, None),
-            CryptoError::Malformed(_) => (CryptoFailureKind::Malformed, None),
-            CryptoError::Store(_) | CryptoError::Io(_) | CryptoError::Mls(_) => (CryptoFailureKind::Other, None),
+        let mut failure = Self {
+            kind: CryptoFailureKind::Other,
+            message,
+            user_id: None,
+            pinned_key: None,
+            presented_key: None,
         };
-        Self { kind, message, user_id }
+        failure.kind = match error {
+            CryptoError::StoreLocked => CryptoFailureKind::StoreLocked,
+            CryptoError::IdentityChanged {
+                user_id,
+                pinned_key,
+                presented_key,
+            } => {
+                failure.user_id = Some(user_id);
+                // An empty pin is "none": a held message whose user has no pin any more.
+                failure.pinned_key = Some(pinned_key).filter(|key| !key.is_empty());
+                failure.presented_key = Some(presented_key);
+                CryptoFailureKind::IdentityChanged
+            }
+            CryptoError::BackupLocked => CryptoFailureKind::BackupLocked,
+            CryptoError::Verification(_) => CryptoFailureKind::Verification,
+            CryptoError::NotFound(_) => CryptoFailureKind::NotFound,
+            CryptoError::Malformed(_) => CryptoFailureKind::Malformed,
+            CryptoError::ResyncRequired => CryptoFailureKind::ResyncRequired,
+            CryptoError::Store(_) | CryptoError::Io(_) | CryptoError::Mls(_) => CryptoFailureKind::Other,
+        };
+        failure
     }
 }
 
@@ -59,6 +85,8 @@ impl CryptoFailure {
             kind: CryptoFailureKind::Malformed,
             message: message.to_owned(),
             user_id: None,
+            pinned_key: None,
+            presented_key: None,
         }
     }
 }
@@ -189,10 +217,41 @@ impl From<raindrop_crypto::store::PinnedIdentity> for PinnedIdentity {
     }
 }
 
-/// A new device's link offer (upload it) and the commitment to put in the link code.
+/// A changed identity key waiting for the user's decision: what the confirmation screen needs, and
+/// what survives a restart. See `CryptoSession::pending_identity_changes`.
+pub struct PendingIdentityChange {
+    pub user_id: String,
+    /// The key this device has pinned for the user; `None` if it has none.
+    pub pinned_key: Option<Vec<u8>>,
+    /// The key they presented: pass it to `accept_changed_identity` to accept the change.
+    pub presented_key: Vec<u8>,
+    /// How many of their messages are held under `presented_key`.
+    pub held_messages: u32,
+    /// The groups those held messages are in.
+    pub held_group_ids: Vec<Vec<u8>>,
+    /// The groups this device is out of because of this change, to join again once it is accepted.
+    pub left_group_ids: Vec<Vec<u8>>,
+}
+
+impl From<raindrop_crypto::store::PendingIdentityChange> for PendingIdentityChange {
+    fn from(p: raindrop_crypto::store::PendingIdentityChange) -> Self {
+        Self {
+            user_id: p.user_id,
+            pinned_key: p.pinned_key,
+            presented_key: p.presented_key,
+            held_messages: u32::try_from(p.held_messages).unwrap_or(u32::MAX),
+            held_group_ids: p.held_group_ids,
+            left_group_ids: p.left_group_ids,
+        }
+    }
+}
+
+/// A new device's link offer (upload it), and the commitment and code secret to put in the link code.
+/// The code secret is never uploaded.
 pub struct LinkOffer {
     pub offer: Vec<u8>,
     pub commitment: Vec<u8>,
+    pub code_secret: Vec<u8>,
 }
 
 /// A freshly sealed backup, and — for a recovery-key backup — the 24 words to show the user once.
@@ -358,16 +417,18 @@ impl CryptoSession {
 
     /// New device: makes its key and a link offer for an existing device to approve.
     pub fn begin_device_link(&self, user_id: String, device_id: String) -> Result<LinkOffer> {
-        let (offer, commitment) = self.session().begin_device_link(&user_id, &device_id)?;
+        let (offer, commitment, code_secret) = self.session().begin_device_link(&user_id, &device_id)?;
         Ok(LinkOffer {
             offer,
             commitment: commitment.to_vec(),
+            code_secret: code_secret.to_vec(),
         })
     }
 
-    /// Existing device: checks the offer against the link code's commitment and approves it.
-    pub fn approve_device_link(&self, offer: Vec<u8>, commitment: Vec<u8>) -> Result<Vec<u8>> {
-        Ok(self.session().approve_device_link(&offer, &commitment)?)
+    /// Existing device: checks the offer against the link code's commitment and approves it, sealed
+    /// to the link code's secret.
+    pub fn approve_device_link(&self, offer: Vec<u8>, commitment: Vec<u8>, code_secret: Vec<u8>) -> Result<Vec<u8>> {
+        Ok(self.session().approve_device_link(&offer, &commitment, &code_secret)?)
     }
 
     /// New device: opens the approval and becomes a full device of the user.
@@ -380,12 +441,25 @@ impl CryptoSession {
     }
 
     /// The user looked at the new safety number and accepts `user_id`'s changed identity key.
+    /// Messages held because they came under that key move into the message cache, so
+    /// `cached_messages` and `receive_message` return them from now on. The record of the groups
+    /// this device left because of that key is cleared too: read `pending_identity_changes` first
+    /// to know which to join again.
     pub fn accept_changed_identity(&self, user_id: String, identity_key: Vec<u8>) -> Result<()> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
-        Ok(self.session().store().replace_identity(&user_id, &identity_key, now)?)
+        self.session().accept_changed_identity(&user_id, &identity_key)?;
+        Ok(())
+    }
+
+    /// Every changed identity key waiting for the user's decision, from the encrypted store (so
+    /// the same after a restart): per user and presented key, the pinned key, the held messages and
+    /// the groups left because of it.
+    pub fn pending_identity_changes(&self) -> Result<Vec<PendingIdentityChange>> {
+        Ok(self
+            .session()
+            .pending_identity_changes()?
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 
     pub fn mark_verified(&self, user_id: String, identity_key: Vec<u8>) -> Result<()> {
@@ -430,8 +504,8 @@ impl CryptoSession {
         Ok(self.session().self_update(&group_id)?.into())
     }
 
-    pub fn join_by_external_commit(&self, group_info: Vec<u8>) -> Result<ExternalJoin> {
-        let (group_id, pending) = self.session().join_by_external_commit(&group_info)?;
+    pub fn join_by_external_commit(&self, expected_group_id: Vec<u8>, group_info: Vec<u8>) -> Result<ExternalJoin> {
+        let (group_id, pending) = self.session().join_by_external_commit(&expected_group_id, &group_info)?;
         Ok(ExternalJoin {
             group_id,
             pending: pending.into(),
@@ -450,6 +524,12 @@ impl CryptoSession {
         Ok(self.session().discard_pending_commit(&group_id)?)
     }
 
+    /// Drops the MLS state for a group about to be rejoined, keeping its cached and held messages.
+    pub fn reset_group(&self, group_id: Vec<u8>) -> Result<()> {
+        Ok(self.session().reset_group(&group_id)?)
+    }
+
+    /// Forgets a group entirely, cached and held messages included.
     pub fn delete_group(&self, group_id: Vec<u8>) -> Result<()> {
         Ok(self.session().delete_group(&group_id)?)
     }

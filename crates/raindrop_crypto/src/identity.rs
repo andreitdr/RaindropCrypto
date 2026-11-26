@@ -59,7 +59,7 @@ impl UserIdentity {
         device_id: &str,
         device_signature_key: &[u8],
         created_at_unix: i64,
-    ) -> DeviceCertificate {
+    ) -> Result<DeviceCertificate> {
         let mut certificate = DeviceCertificate {
             user_id: user_id.to_owned(),
             device_id: device_id.to_owned(),
@@ -68,8 +68,8 @@ impl UserIdentity {
             created_at_unix,
             signature: Vec::new(),
         };
-        certificate.signature = self.key.sign(&certificate.signed_bytes()).to_bytes().to_vec();
-        certificate
+        certificate.signature = self.key.sign(&certificate.signed_bytes()?).to_bytes().to_vec();
+        Ok(certificate)
     }
 }
 
@@ -99,33 +99,34 @@ impl DeviceCertificate {
         let key = VerifyingKey::from_bytes(key).map_err(|e| CryptoError::Verification(e.to_string()))?;
         let signature = Signature::from_slice(&self.signature).map_err(|e| CryptoError::Verification(e.to_string()))?;
 
-        key.verify_strict(&self.signed_bytes(), &signature)
+        key.verify_strict(&self.signed_bytes()?, &signature)
             .map_err(|_| CryptoError::Verification("device certificate signature is invalid".into()))
     }
 
     /// The exact bytes the identity key signs: a context string, then every field, length-prefixed
     /// so no two different certificates can serialise the same way.
-    fn signed_bytes(&self) -> Vec<u8> {
+    fn signed_bytes(&self) -> Result<Vec<u8>> {
         let mut out = CERTIFICATE_CONTEXT.to_vec();
         out.push(CERTIFICATE_VERSION);
-        write_field(&mut out, self.user_id.as_bytes());
-        write_field(&mut out, self.device_id.as_bytes());
-        write_field(&mut out, &self.device_signature_key);
-        write_field(&mut out, &self.user_identity_key);
+        write_field(&mut out, self.user_id.as_bytes())?;
+        write_field(&mut out, self.device_id.as_bytes())?;
+        write_field(&mut out, &self.device_signature_key)?;
+        write_field(&mut out, &self.user_identity_key)?;
         out.extend_from_slice(&self.created_at_unix.to_be_bytes());
-        out
+        Ok(out)
     }
 
-    /// The wire form: what goes into the MLS credential and to the server.
-    pub fn to_bytes(&self) -> Vec<u8> {
+    /// The wire form: what goes into the MLS credential and to the server. Fails when a field is
+    /// too long for its two-byte length prefix.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut out = vec![CERTIFICATE_VERSION];
-        write_field(&mut out, self.user_id.as_bytes());
-        write_field(&mut out, self.device_id.as_bytes());
-        write_field(&mut out, &self.device_signature_key);
-        write_field(&mut out, &self.user_identity_key);
+        write_field(&mut out, self.user_id.as_bytes())?;
+        write_field(&mut out, self.device_id.as_bytes())?;
+        write_field(&mut out, &self.device_signature_key)?;
+        write_field(&mut out, &self.user_identity_key)?;
         out.extend_from_slice(&self.created_at_unix.to_be_bytes());
-        write_field(&mut out, &self.signature);
-        out
+        write_field(&mut out, &self.signature)?;
+        Ok(out)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -153,10 +154,12 @@ impl DeviceCertificate {
     }
 }
 
-fn write_field(out: &mut Vec<u8>, field: &[u8]) {
-    let length = u16::try_from(field.len()).expect("certificate fields are short");
+fn write_field(out: &mut Vec<u8>, field: &[u8]) -> Result<()> {
+    let length = u16::try_from(field.len())
+        .map_err(|_| CryptoError::Malformed("a device certificate field is longer than 65,535 bytes".into()))?;
     out.extend_from_slice(&length.to_be_bytes());
     out.extend_from_slice(field);
+    Ok(())
 }
 
 struct Reader<'a>(&'a [u8]);
@@ -224,21 +227,40 @@ mod tests {
     #[test]
     fn a_certificate_round_trips_and_verifies() {
         let identity = UserIdentity::generate();
-        let certificate = identity.certify_device("user-1", "device-1", &[9; 32], 1_700_000_000);
+        let certificate = identity.certify_device("user-1", "device-1", &[9; 32], 1_700_000_000).unwrap();
 
-        let decoded = DeviceCertificate::from_bytes(&certificate.to_bytes()).unwrap();
+        let decoded = DeviceCertificate::from_bytes(&certificate.to_bytes().unwrap()).unwrap();
         assert_eq!(decoded, certificate);
         decoded.verify().unwrap();
     }
 
     #[test]
+    fn an_over_long_identifier_is_malformed_not_a_panic() {
+        let identity = UserIdentity::generate();
+        let long = "x".repeat(u16::MAX as usize + 1);
+        assert!(matches!(
+            identity.certify_device(&long, "device-1", &[9; 32], 1),
+            Err(CryptoError::Malformed(_))
+        ));
+        assert!(matches!(
+            identity.certify_device("user-1", &long, &[9; 32], 1),
+            Err(CryptoError::Malformed(_))
+        ));
+
+        // The longest field that fits still certifies and round-trips.
+        let longest = "x".repeat(u16::MAX as usize);
+        let certificate = identity.certify_device(&longest, "device-1", &[9; 32], 1).unwrap();
+        assert_eq!(DeviceCertificate::from_bytes(&certificate.to_bytes().unwrap()).unwrap(), certificate);
+    }
+
+    #[test]
     fn a_tampered_certificate_does_not_verify() {
         let identity = UserIdentity::generate();
-        let mut certificate = identity.certify_device("user-1", "device-1", &[9; 32], 1);
+        let mut certificate = identity.certify_device("user-1", "device-1", &[9; 32], 1).unwrap();
         certificate.device_id = "device-2".into();
         assert!(certificate.verify().is_err());
 
-        let mut swapped = identity.certify_device("user-1", "device-1", &[9; 32], 1);
+        let mut swapped = identity.certify_device("user-1", "device-1", &[9; 32], 1).unwrap();
         swapped.user_identity_key = UserIdentity::generate().public_key().to_vec();
         assert!(swapped.verify().is_err());
     }

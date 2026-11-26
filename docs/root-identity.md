@@ -98,7 +98,8 @@ PIN lock:     "RDPL" | version: u8 = 1 | memory_kib: u32 | iterations: u32 | par
 `root::seal_with_pin` / `open_with_pin`, for a device with no biometric or system credential. Argon2id,
 64 MiB and 3 passes by default (`PinCost`): lighter than a backup passphrase because it runs at every
 unlock and the blob never leaves the device. On opening, the cost read from the blob must be within
-19 MiB–1 GiB and 1–20 passes. A wrong PIN is `BackupLocked`.
+19 MiB–512 MiB, 1–10 passes and 1–8 lanes of parallelism, checked before the KDF runs; anything else is
+`Malformed`. A wrong PIN is `BackupLocked`.
 
 ## Pairing a device
 
@@ -106,11 +107,18 @@ unlock and the blob never leaves the device. On opening, the cost read from the 
 identity and named a user.
 
 1. The **new** device calls `pairing::begin(device_name, platform)`: an offer (name, platform, a fresh
-   X25519 key), its 16-byte commitment, and the exchange secret to hold until the approval arrives.
-2. The person carries the pairing code (the relay's id for the offer plus the commitment) to an
-   **existing** device, scanned or typed. `pairing::approve(offer, commitment, payload)` refuses an offer
-   that does not match the commitment, then seals the payload to the offer's key.
-3. The new device calls `pairing::complete(approval, offer, exchange_secret)`.
+   X25519 key), its 16-byte commitment, a random 16-byte code secret (`CODE_SECRET_LENGTH`), and the
+   exchange secret to hold until the approval arrives. The code secret never goes to the relay.
+2. The person carries the pairing code (the relay's id for the offer, the commitment and the code
+   secret) to an **existing** device, scanned or typed. `pairing::approve(offer, commitment, code_secret,
+   payload)` refuses an offer that does not match the commitment, then seals the payload to the offer's
+   key and the code secret.
+3. The new device calls `pairing::complete(approval, offer, exchange_secret, code_secret)`. An approval
+   that does not open is `Verification`.
+
+The commitment stops a relay from swapping in an offer of its own (new → existing); the code secret
+stops it from sealing a root of its own to the offer's key and serving that as the approval
+(existing → new), since it holds the offer but not the code.
 
 The payload is the caller's bytes: the root, the recovery seed, the vault contents and the
 authenticator secret. The authenticator secret travels **only** this way — never in the vault, where
@@ -118,12 +126,13 @@ leaked recovery words would reveal it.
 
 ```text
 offer:     version: u8 = 1 | name_len: u16 | name | platform_len: u16 | platform | exchange_key: 32
-approval:  version: u8 = 1 | sender_key: 32 | nonce: 24 | ciphertext
+approval:  version: u8 = 2 | sender_key: 32 | nonce: 24 | ciphertext
 ```
 
-Sealing is X25519 with a fresh sender key, HKDF-SHA256 over the shared secret with
-`info = "raindrop/device-pairing/v1\n" | offer | sender_key`, then XChaCha20-Poly1305 with the sender key
-as associated data. An all-zero shared secret is refused. Names and platforms are at most 64 bytes; they
+Sealing is X25519 with a fresh sender key, HKDF-SHA256 over the shared secret with the code secret as
+salt and `info = "raindrop/device-pairing/v2\n" | offer | sender_key`, then XChaCha20-Poly1305 with the
+sender key as associated data. The commitment is the first 16 bytes of
+`SHA-256("raindrop/device-pairing/v2\n" | offer)`. An all-zero shared secret is refused. Names and platforms are at most 64 bytes; they
 are chosen by the new device and are a label to recognise it by, never a reason to approve.
 
 ## What this does not protect against

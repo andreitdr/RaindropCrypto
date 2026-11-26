@@ -142,8 +142,14 @@ pub fn open_with_passphrase(blob: &[u8], passphrase: &str) -> Result<BackupConte
     };
 
     // A blob is attacker-controlled input: refuse costs that are too weak to have been made by
-    // this code, or large enough to exhaust the device.
-    if cost.memory_kib < 19 * 1024 || cost.memory_kib > 1024 * 1024 || cost.iterations == 0 || cost.iterations > 20 {
+    // this code, or large enough to exhaust a phone (the default writes 256 MiB and 3 passes).
+    if cost.memory_kib < 19 * 1024
+        || cost.memory_kib > 512 * 1024
+        || cost.iterations == 0
+        || cost.iterations > 10
+        || cost.parallelism == 0
+        || cost.parallelism > 8
+    {
         return Err(CryptoError::Malformed("backup passphrase cost is out of range".into()));
     }
 
@@ -292,5 +298,31 @@ mod tests {
         let mut weakened = blob.clone();
         weakened[13] ^= 1;
         assert!(open_with_passphrase(&weakened, "correct horse battery staple").is_err());
+    }
+
+    #[test]
+    fn a_passphrase_cost_out_of_range_is_refused_before_hashing() {
+        // The header is read before it is authenticated, so each cost field is checked on its
+        // own: memory (offset 6), iterations (10) and parallelism (14) just outside their limits.
+        let blob = seal_with_passphrase(&contents(), "correct horse battery staple", TEST_COST).unwrap();
+        let cases: [(usize, u32); 6] = [
+            (6, 512 * 1024 + 1),
+            (6, 19 * 1024 - 1),
+            (10, 0),
+            (10, 11),
+            (14, 0),
+            (14, 9),
+        ];
+        for (at, value) in cases {
+            let mut forged = blob.clone();
+            forged[at..at + 4].copy_from_slice(&value.to_be_bytes());
+            assert!(
+                matches!(
+                    open_with_passphrase(&forged, "correct horse battery staple"),
+                    Err(CryptoError::Malformed(_))
+                ),
+                "field at offset {at} set to {value} was not refused as malformed"
+            );
+        }
     }
 }

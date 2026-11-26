@@ -3,16 +3,19 @@
 //! substitute it.
 //!
 //! 1. The **new** device makes an [`Offer`]: its user and device ids, its device signature key and a
-//!    fresh X25519 key. It uploads the offer and shows a link code carrying the server's link id and
-//!    a [`commitment`] to the offer: 128 bits of SHA-256 over it.
+//!    fresh X25519 key. It uploads the offer and shows a link code carrying the server's link id, a
+//!    [`commitment`] to the offer (128 bits of SHA-256 over it) and a random code secret
+//!    ([`CODE_SECRET_LENGTH`] bytes) that is never uploaded.
 //! 2. The user carries the link code to an **existing** device (a QR code, or typed). That device
 //!    fetches the offer, refuses it unless it matches the commitment (so a server that swapped in its
 //!    own keys is caught), certifies the new device key with the identity key, and seals the identity
-//!    secret, certificate and pins to the offer's X25519 key ([`seal_approval`]).
-//! 3. The new device opens the approval ([`open_approval`]) and installs the identity.
+//!    secret, certificate and pins to the offer's X25519 key and the code secret ([`seal_approval`]).
+//! 3. The new device opens the approval ([`open_approval`]) and installs the identity. Only a device
+//!    that saw the code can have sealed it, so a server that seals an identity of its own to the
+//!    offer's key is caught too.
 //!
-//! Sealing is X25519 with a fresh sender key, then HKDF-SHA256 over the shared secret, bound to the
-//! whole offer and both public keys, then XChaCha20-Poly1305.
+//! Sealing is X25519 with a fresh sender key, then HKDF-SHA256 over the shared secret, salted with
+//! the code secret and bound to the whole offer and both public keys, then XChaCha20-Poly1305.
 
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
@@ -27,12 +30,16 @@ use crate::error::{CryptoError, Result};
 use crate::random;
 
 const OFFER_VERSION: u8 = 1;
-const APPROVAL_VERSION: u8 = 1;
-const CONTEXT: &[u8] = b"raindrop/device-link/v1\n";
+const APPROVAL_VERSION: u8 = 2;
+const CONTEXT: &[u8] = b"raindrop/device-link/v2\n";
 
 /// Bytes of commitment in a link code. 128 bits makes finding a second offer with the same
 /// commitment infeasible for a server that sees the first.
 pub const COMMITMENT_LENGTH: usize = 16;
+
+/// Bytes of code secret in a link code: 128 bits the server never sees, mixed into the key the
+/// approval is sealed under, so only a device that saw the code can seal one the new device opens.
+pub const CODE_SECRET_LENGTH: usize = 16;
 
 /// What a new device publishes about itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,13 +51,13 @@ pub struct Offer {
 }
 
 impl Offer {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut out = vec![OFFER_VERSION];
-        field(&mut out, self.user_id.as_bytes());
-        field(&mut out, self.device_id.as_bytes());
-        field(&mut out, &self.device_signature_key);
+        field(&mut out, self.user_id.as_bytes())?;
+        field(&mut out, self.device_id.as_bytes())?;
+        field(&mut out, &self.device_signature_key)?;
         out.extend_from_slice(&self.exchange_key);
-        out
+        Ok(out)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -109,12 +116,24 @@ pub(crate) fn exchange_public(secret: &StaticSecret) -> [u8; 32] {
     PublicKey::from(secret).to_bytes()
 }
 
-/// Seals `contents` so only the holder of the offer's exchange key can open them.
-pub(crate) fn seal_approval(offer_bytes: &[u8], offer: &Offer, contents: &ApprovalContents) -> Result<Vec<u8>> {
+/// A fresh code secret for a new device's link code.
+pub(crate) fn new_code_secret() -> Zeroizing<[u8; CODE_SECRET_LENGTH]> {
+    random::bytes::<CODE_SECRET_LENGTH>()
+}
+
+/// Seals `contents` so only the holder of the offer's exchange key and the link code's secret can
+/// open them.
+pub(crate) fn seal_approval(
+    offer_bytes: &[u8],
+    offer: &Offer,
+    code_secret: &[u8],
+    contents: &ApprovalContents,
+) -> Result<Vec<u8>> {
+    let code_secret = code_secret_from(code_secret)?;
     let sender = new_exchange_secret();
     let sender_public = exchange_public(&sender);
     let shared = Zeroizing::new(sender.diffie_hellman(&PublicKey::from(offer.exchange_key)).to_bytes());
-    let key = derive_key(&shared, offer_bytes, &sender_public)?;
+    let key = derive_key(&shared, code_secret, offer_bytes, &sender_public)?;
 
     let plaintext = Zeroizing::new(serde_json::to_vec(contents)?);
     let nonce = random::bytes::<24>();
@@ -136,17 +155,24 @@ pub(crate) fn seal_approval(offer_bytes: &[u8], offer: &Offer, contents: &Approv
     Ok(out)
 }
 
-/// Opens an approval with the new device's exchange secret and the offer it made.
-pub(crate) fn open_approval(approval: &[u8], offer_bytes: &[u8], secret: &StaticSecret) -> Result<ApprovalContents> {
+/// Opens an approval with the new device's exchange secret, the code secret from its link code and
+/// the offer it made.
+pub(crate) fn open_approval(
+    approval: &[u8],
+    offer_bytes: &[u8],
+    secret: &StaticSecret,
+    code_secret: &[u8],
+) -> Result<ApprovalContents> {
     if approval.len() < 1 + 32 + 24 + 16 || approval[0] != APPROVAL_VERSION {
         return Err(CryptoError::Malformed("not a device link approval".into()));
     }
+    let code_secret = code_secret_from(code_secret)?;
     let sender_public: [u8; 32] = approval[1..33].try_into().unwrap();
     let nonce = &approval[33..57];
     let ciphertext = &approval[57..];
 
     let shared = Zeroizing::new(secret.diffie_hellman(&PublicKey::from(sender_public)).to_bytes());
-    let key = derive_key(&shared, offer_bytes, &sender_public)?;
+    let key = derive_key(&shared, code_secret, offer_bytes, &sender_public)?;
 
     let plaintext = Zeroizing::new(
         XChaCha20Poly1305::new_from_slice(key.as_slice())
@@ -163,7 +189,18 @@ pub(crate) fn open_approval(approval: &[u8], offer_bytes: &[u8], secret: &Static
     serde_json::from_slice(&plaintext).map_err(|_| CryptoError::Malformed("device link approval contents".into()))
 }
 
-fn derive_key(shared: &[u8; 32], offer_bytes: &[u8], sender_public: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>> {
+fn code_secret_from(code_secret: &[u8]) -> Result<&[u8; CODE_SECRET_LENGTH]> {
+    code_secret
+        .try_into()
+        .map_err(|_| CryptoError::Malformed("a link code secret is 16 bytes".into()))
+}
+
+fn derive_key(
+    shared: &[u8; 32],
+    code_secret: &[u8; CODE_SECRET_LENGTH],
+    offer_bytes: &[u8],
+    sender_public: &[u8; 32],
+) -> Result<Zeroizing<[u8; 32]>> {
     // A low-order public key would make the shared secret all zeros; refuse rather than derive a
     // key an attacker can predict.
     if shared.iter().all(|b| *b == 0) {
@@ -174,15 +211,19 @@ fn derive_key(shared: &[u8; 32], offer_bytes: &[u8], sender_public: &[u8; 32]) -
     info.extend_from_slice(sender_public);
 
     let mut key = Zeroizing::new([0u8; 32]);
-    Hkdf::<Sha256>::new(None, shared)
+    // The code secret is the salt: it is what the server does not have.
+    Hkdf::<Sha256>::new(Some(code_secret), shared)
         .expand(&info, key.as_mut())
         .map_err(|_| CryptoError::Store("hkdf".into()))?;
     Ok(key)
 }
 
-fn field(out: &mut Vec<u8>, value: &[u8]) {
-    out.extend_from_slice(&(value.len() as u16).to_be_bytes());
+fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<()> {
+    let length = u16::try_from(value.len())
+        .map_err(|_| CryptoError::Malformed("a device link field is longer than 65,535 bytes".into()))?;
+    out.extend_from_slice(&length.to_be_bytes());
     out.extend_from_slice(value);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -210,26 +251,53 @@ mod tests {
     fn an_offer_round_trips() {
         let secret = new_exchange_secret();
         let offer = offer(&secret);
-        assert_eq!(Offer::from_bytes(&offer.to_bytes()).unwrap(), offer);
-        assert!(Offer::from_bytes(&offer.to_bytes()[..10]).is_err());
+        assert_eq!(Offer::from_bytes(&offer.to_bytes().unwrap()).unwrap(), offer);
+        assert!(Offer::from_bytes(&offer.to_bytes().unwrap()[..10]).is_err());
+    }
+
+    #[test]
+    fn an_over_long_identifier_in_an_offer_is_malformed_not_a_panic() {
+        let secret = new_exchange_secret();
+        let mut too_long = offer(&secret);
+        too_long.user_id = "x".repeat(u16::MAX as usize + 1);
+        assert!(matches!(too_long.to_bytes(), Err(CryptoError::Malformed(_))));
     }
 
     #[test]
     fn only_the_offering_device_opens_the_approval() {
         let secret = new_exchange_secret();
         let offer = offer(&secret);
-        let bytes = offer.to_bytes();
-        let approval = seal_approval(&bytes, &offer, &contents()).unwrap();
+        let bytes = offer.to_bytes().unwrap();
+        let code = new_code_secret();
+        let approval = seal_approval(&bytes, &offer, code.as_slice(), &contents()).unwrap();
 
-        let opened = open_approval(&approval, &bytes, &secret).unwrap();
+        let opened = open_approval(&approval, &bytes, &secret, code.as_slice()).unwrap();
         assert_eq!(opened.user_identity_secret, vec![9; 32]);
 
-        assert!(open_approval(&approval, &bytes, &new_exchange_secret()).is_err());
+        assert!(open_approval(&approval, &bytes, &new_exchange_secret(), code.as_slice()).is_err());
 
         // Bound to the exact offer: the same key with a different offer does not open it.
         let mut other = offer.clone();
         other.device_id = "other".into();
-        assert!(open_approval(&approval, &other.to_bytes(), &secret).is_err());
+        assert!(open_approval(&approval, &other.to_bytes().unwrap(), &secret, code.as_slice()).is_err());
+    }
+
+    #[test]
+    fn an_approval_sealed_without_the_code_secret_does_not_open() {
+        // The server holds the offer and can seal to its key; it never sees the code secret.
+        let secret = new_exchange_secret();
+        let offer = offer(&secret);
+        let bytes = offer.to_bytes().unwrap();
+        let code = new_code_secret();
+        let forged = seal_approval(&bytes, &offer, &[0u8; CODE_SECRET_LENGTH], &contents()).unwrap();
+        assert!(matches!(
+            open_approval(&forged, &bytes, &secret, code.as_slice()),
+            Err(CryptoError::Verification(_))
+        ));
+        assert!(matches!(
+            seal_approval(&bytes, &offer, &[0u8; 8], &contents()),
+            Err(CryptoError::Malformed(_))
+        ));
     }
 
     #[test]
@@ -238,6 +306,6 @@ mod tests {
         let a = offer(&secret);
         let mut b = a.clone();
         b.exchange_key[0] ^= 1;
-        assert_ne!(commitment(&a.to_bytes()), commitment(&b.to_bytes()));
+        assert_ne!(commitment(&a.to_bytes().unwrap()), commitment(&b.to_bytes().unwrap()));
     }
 }

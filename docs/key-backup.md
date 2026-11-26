@@ -43,8 +43,9 @@ holding a copy of the blob, which includes the server. The cost is stored in the
 raised later without invalidating old backups.
 
 A blob is attacker-controlled input, so `open_with_passphrase` refuses costs outside the range this code
-would produce: memory below 19 MiB or above 1 GiB, or iterations of 0 or more than 20, fails with
-`Malformed`.
+would produce, before running the KDF: memory below 19 MiB or above 512 MiB, iterations of 0 or more than
+10, or parallelism of 0 or more than 8, fails with `Malformed`. The limits sit above the default and the
+test cost, and low enough that a phone is not killed by a blob the server edited.
 
 ## Blob layout
 

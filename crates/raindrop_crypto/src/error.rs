@@ -23,8 +23,16 @@ pub enum CryptoError {
 
     /// A user's identity key differs from the one pinned for them. Never resolved silently: the
     /// user has to look at the new safety number and accept it.
+    ///
+    /// Carries both keys so the client can show the two safety numbers and, on acceptance, pass the
+    /// exact key back to `Session::accept_changed_identity`: `pinned_key` is what this device
+    /// trusted until now, `presented_key` is what the certificate in front of it carried.
     #[error("the identity key of user {user_id} changed")]
-    IdentityChanged { user_id: String },
+    IdentityChanged {
+        user_id: String,
+        pinned_key: Vec<u8>,
+        presented_key: Vec<u8>,
+    },
 
     /// A backup could not be opened: wrong recovery key or passphrase, or a damaged blob.
     #[error("the backup could not be decrypted")]
@@ -37,6 +45,13 @@ pub enum CryptoError {
     /// Reading or writing a file failed (an attachment being encrypted or decrypted).
     #[error("file error: {0}")]
     Io(String),
+
+    /// The server delivered a commit claiming to be this device's own that this device does not
+    /// hold (it discarded it after the server had in fact accepted it, or another member forged
+    /// it). The local group cannot follow it: reset the group (`Session::reset_group`, which keeps the
+    /// cached messages) and rejoin it.
+    #[error("own commit echoed that this device does not hold; rejoin the group")]
+    ResyncRequired,
 
     /// An MLS operation failed.
     #[error("mls error: {0}")]

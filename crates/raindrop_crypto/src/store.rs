@@ -6,9 +6,19 @@
 //! keys once it moves on (that is what forward secrecy means), so ciphertext fetched again from the
 //! server later can no longer be decrypted. The plaintext kept here is the only copy.
 //!
+//! Beside it are **held messages**: ones MLS decrypted (spending their key) from a sender whose
+//! identity key no longer matches this device's pin. They are not shown until the user accepts the
+//! changed key, and then move into the cache; until then they stay here, as protected as the cache.
+//!
+//! A device that **left a group because a member's identity key changed** (their commit was refused,
+//! or joining was) records that too, with the key it was shown, so the client can list what is waiting
+//! for the user's decision after a restart and rejoin those groups once the key is accepted
+//! ([`Store::pending_identity_changes`]).
+//!
 //! MLS state and Raindrop's own tables share the file but not the connection: OpenMLS's storage
 //! provider owns one, [`Store`] another, and WAL mode lets them coexist.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
@@ -81,6 +91,34 @@ pub struct CachedMessage {
     pub payload: Vec<u8>,
 }
 
+/// A decrypted message withheld because its sender's identity key differs from the one pinned for
+/// them. Released into the message cache when the user accepts that key
+/// ([`Store::release_held_messages`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeldMessage {
+    pub message: CachedMessage,
+    /// The identity key the sender's certificate carried: only accepting this key releases it.
+    pub sender_identity_key: Vec<u8>,
+}
+
+/// A changed identity key waiting for the user's decision, as the client lists it: one per user and
+/// presented key, built from the held messages and the groups this device left because of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingIdentityChange {
+    pub user_id: String,
+    /// The key this device has pinned for the user now; `None` if it has none (it cannot be, for a
+    /// held message, but a pin can be removed by restoring a store).
+    pub pinned_key: Option<Vec<u8>>,
+    /// The key the user's certificate presented: the one to pass to accept.
+    pub presented_key: Vec<u8>,
+    /// How many of their messages are held under `presented_key`.
+    pub held_messages: usize,
+    /// The groups those held messages are in.
+    pub held_group_ids: Vec<Vec<u8>>,
+    /// The groups this device is out of because of this change, to join again once it is accepted.
+    pub left_group_ids: Vec<Vec<u8>>,
+}
+
 /// Raindrop's own tables in the encrypted database.
 pub struct Store {
     connection: Connection,
@@ -111,7 +149,27 @@ impl Store {
                  payload          BLOB NOT NULL,
                  PRIMARY KEY (group_id, message_id)
              );
-             CREATE INDEX IF NOT EXISTS rd_messages_by_time ON rd_messages (group_id, sent_at);",
+             CREATE INDEX IF NOT EXISTS rd_messages_by_time ON rd_messages (group_id, sent_at);
+             CREATE TABLE IF NOT EXISTS rd_held_messages (
+                 group_id            BLOB NOT NULL,
+                 message_id          TEXT NOT NULL,
+                 sender_user_id      TEXT NOT NULL,
+                 sender_device_id    TEXT NOT NULL,
+                 sender_identity_key BLOB NOT NULL,
+                 epoch               INTEGER NOT NULL,
+                 sent_at             INTEGER NOT NULL,
+                 payload             BLOB NOT NULL,
+                 PRIMARY KEY (group_id, message_id)
+             );
+             CREATE INDEX IF NOT EXISTS rd_held_messages_by_sender
+                 ON rd_held_messages (sender_user_id, sender_identity_key);
+             CREATE TABLE IF NOT EXISTS rd_identity_left_groups (
+                 group_id      BLOB NOT NULL,
+                 user_id       TEXT NOT NULL,
+                 presented_key BLOB NOT NULL,
+                 recorded_at   INTEGER NOT NULL,
+                 PRIMARY KEY (group_id, user_id)
+             );",
         )?;
         Ok(Self { connection })
     }
@@ -187,6 +245,8 @@ impl Store {
             if existing.identity_key != identity_key {
                 return Err(CryptoError::IdentityChanged {
                     user_id: user_id.to_owned(),
+                    pinned_key: existing.identity_key,
+                    presented_key: identity_key.to_vec(),
                 });
             }
             return Ok(existing);
@@ -279,19 +339,201 @@ impl Store {
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
-    /// Removes a message's plaintext — when it was deleted, or its channel was.
+    /// Removes a message's plaintext — when it was deleted, or its channel was. A held copy goes too.
     pub fn delete_message(&self, group_id: &[u8], message_id: &str) -> Result<()> {
         self.connection.execute(
             "DELETE FROM rd_messages WHERE group_id = ?1 AND message_id = ?2",
             params![group_id, message_id],
         )?;
+        self.connection.execute(
+            "DELETE FROM rd_held_messages WHERE group_id = ?1 AND message_id = ?2",
+            params![group_id, message_id],
+        )?;
         Ok(())
     }
 
+    /// Removes every message of a group, cached or held.
     pub fn delete_group_messages(&self, group_id: &[u8]) -> Result<()> {
         self.connection
             .execute("DELETE FROM rd_messages WHERE group_id = ?1", [group_id])?;
+        self.connection
+            .execute("DELETE FROM rd_held_messages WHERE group_id = ?1", [group_id])?;
+        self.forget_left_group(group_id)?;
         Ok(())
+    }
+
+    // ── Held messages ────────────────────────────────────────────────────────────────────────
+
+    /// Withholds a decrypted message whose sender's identity key changed. Like
+    /// [`Store::put_message`], a second copy of the same message keeps the first.
+    pub fn hold_message(&self, held: &HeldMessage) -> Result<()> {
+        let message = &held.message;
+        self.connection.execute(
+            "INSERT OR IGNORE INTO rd_held_messages
+                 (group_id, message_id, sender_user_id, sender_device_id, sender_identity_key, epoch, sent_at,
+                  payload)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                message.group_id,
+                message.message_id,
+                message.sender_user_id,
+                message.sender_device_id,
+                held.sender_identity_key,
+                message.epoch as i64,
+                message.sent_at_unix_ms,
+                message.payload
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Who sent a held message and under which identity key, if `message_id` is one.
+    pub fn held_message_origin(&self, group_id: &[u8], message_id: &str) -> Result<Option<(String, Vec<u8>)>> {
+        Ok(self
+            .connection
+            .query_row(
+                "SELECT sender_user_id, sender_identity_key FROM rd_held_messages
+                 WHERE group_id = ?1 AND message_id = ?2",
+                params![group_id, message_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?)
+    }
+
+    /// Every message of a group still held, oldest first.
+    pub fn held_messages(&self, group_id: &[u8]) -> Result<Vec<HeldMessage>> {
+        let mut statement = self.connection.prepare(
+            "SELECT group_id, message_id, sender_user_id, sender_device_id, epoch, sent_at, payload,
+                    sender_identity_key
+             FROM rd_held_messages
+             WHERE group_id = ?1
+             ORDER BY sent_at, message_id",
+        )?;
+        let rows = statement.query_map([group_id], |row| {
+            Ok(HeldMessage {
+                message: Self::read_message(row)?,
+                sender_identity_key: row.get(7)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Moves every message held for `user_id` under `identity_key` into the message cache, in one
+    /// transaction, and returns how many. Messages held under any other key stay held.
+    pub fn release_held_messages(&self, user_id: &str, identity_key: &[u8]) -> Result<usize> {
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "INSERT OR IGNORE INTO rd_messages
+                 (group_id, message_id, sender_user_id, sender_device_id, epoch, sent_at, payload)
+             SELECT group_id, message_id, sender_user_id, sender_device_id, epoch, sent_at, payload
+             FROM rd_held_messages WHERE sender_user_id = ?1 AND sender_identity_key = ?2",
+            params![user_id, identity_key],
+        )?;
+        let released = transaction.execute(
+            "DELETE FROM rd_held_messages WHERE sender_user_id = ?1 AND sender_identity_key = ?2",
+            params![user_id, identity_key],
+        )?;
+        transaction.commit()?;
+        Ok(released)
+    }
+
+    // ── Groups left because of a changed identity ────────────────────────────────────────────
+
+    /// Records that this device is out of `group_id` because `user_id` presented `presented_key`
+    /// against a different pin. A second record for the same group and user replaces the first (the
+    /// key may have changed again).
+    pub fn record_left_group(&self, group_id: &[u8], user_id: &str, presented_key: &[u8], now_unix: i64) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO rd_identity_left_groups (group_id, user_id, presented_key, recorded_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (group_id, user_id) DO UPDATE SET presented_key = excluded.presented_key,
+                                                           recorded_at = excluded.recorded_at",
+            params![group_id, user_id, presented_key, now_unix],
+        )?;
+        Ok(())
+    }
+
+    /// Forgets every record for `group_id`: the device is in the group again, or the group is gone.
+    pub fn forget_left_group(&self, group_id: &[u8]) -> Result<()> {
+        self.connection
+            .execute("DELETE FROM rd_identity_left_groups WHERE group_id = ?1", [group_id])?;
+        Ok(())
+    }
+
+    /// Forgets the records made for `user_id` under `presented_key`, because the user accepted that
+    /// key. Records under any other key stay.
+    pub fn clear_left_groups(&self, user_id: &str, presented_key: &[u8]) -> Result<()> {
+        self.connection.execute(
+            "DELETE FROM rd_identity_left_groups WHERE user_id = ?1 AND presented_key = ?2",
+            params![user_id, presented_key],
+        )?;
+        Ok(())
+    }
+
+    /// Every changed identity key waiting for the user's decision, ordered by user and key: the
+    /// held messages grouped by sender and key, joined with the groups left because of them. All of
+    /// it is read from the encrypted store, so it is the same after a restart.
+    pub fn pending_identity_changes(&self) -> Result<Vec<PendingIdentityChange>> {
+        let mut pending: BTreeMap<(String, Vec<u8>), PendingIdentityChange> = BTreeMap::new();
+        fn entry(
+            pending: &mut BTreeMap<(String, Vec<u8>), PendingIdentityChange>,
+            user_id: String,
+            key: Vec<u8>,
+        ) -> &mut PendingIdentityChange {
+            pending
+                .entry((user_id.clone(), key.clone()))
+                .or_insert_with(|| PendingIdentityChange {
+                    user_id,
+                    pinned_key: None,
+                    presented_key: key,
+                    held_messages: 0,
+                    held_group_ids: Vec::new(),
+                    left_group_ids: Vec::new(),
+                })
+        }
+
+        let mut held = self.connection.prepare(
+            "SELECT sender_user_id, sender_identity_key, group_id, COUNT(*)
+             FROM rd_held_messages
+             GROUP BY sender_user_id, sender_identity_key, group_id
+             ORDER BY sender_user_id, sender_identity_key, group_id",
+        )?;
+        let rows = held.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (user_id, key, group_id, count) = row?;
+            let change = entry(&mut pending, user_id, key);
+            change.held_messages += usize::try_from(count).unwrap_or(0);
+            change.held_group_ids.push(group_id);
+        }
+
+        let mut left = self.connection.prepare(
+            "SELECT user_id, presented_key, group_id FROM rd_identity_left_groups
+             ORDER BY user_id, presented_key, group_id",
+        )?;
+        let rows = left.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+            ))
+        })?;
+        for row in rows {
+            let (user_id, key, group_id) = row?;
+            entry(&mut pending, user_id, key).left_group_ids.push(group_id);
+        }
+
+        let mut changes: Vec<PendingIdentityChange> = pending.into_values().collect();
+        for change in &mut changes {
+            change.pinned_key = self.pinned_identity(&change.user_id)?.map(|pin| pin.identity_key);
+        }
+        Ok(changes)
     }
 
     fn read_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<CachedMessage> {
@@ -368,6 +610,32 @@ mod tests {
         let pinned = store.pinned_identity("alice").unwrap().unwrap();
         assert_eq!(pinned.identity_key, b"key-2");
         assert!(!pinned.verified);
+    }
+
+    #[test]
+    fn left_groups_are_recorded_per_key_and_cleared_by_that_key_or_the_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("s.db"), &key(5)).unwrap();
+        store.pin_identity("bob", b"old", 1).unwrap();
+
+        store.record_left_group(b"g1", "bob", b"new-1", 10).unwrap();
+        store.record_left_group(b"g2", "bob", b"new-1", 11).unwrap();
+        // Bob changed again before the first was accepted: the record is replaced, not duplicated.
+        store.record_left_group(b"g2", "bob", b"new-2", 12).unwrap();
+
+        let pending = store.pending_identity_changes().unwrap();
+        assert_eq!(pending.len(), 2);
+        assert_eq!(pending[0].presented_key, b"new-1");
+        assert_eq!(pending[0].left_group_ids, vec![b"g1".to_vec()]);
+        assert_eq!(pending[1].presented_key, b"new-2");
+        assert_eq!(pending[1].left_group_ids, vec![b"g2".to_vec()]);
+        assert_eq!(pending[0].pinned_key.as_deref(), Some(&b"old"[..]));
+        assert_eq!(pending[0].held_messages, 0);
+
+        store.clear_left_groups("bob", b"new-1").unwrap();
+        assert_eq!(store.pending_identity_changes().unwrap().len(), 1);
+        store.delete_group_messages(b"g2").unwrap();
+        assert!(store.pending_identity_changes().unwrap().is_empty());
     }
 
     #[test]

@@ -25,6 +25,19 @@ The method surface mirrors `Session` one-for-one; see [Architecture overview](ar
 for what each group does. Two free functions sit outside `CryptoSession`: `safety_number` and
 `backup_needs_passphrase`, both `#[frb(sync)]` since neither touches the store.
 
+The changed-identity decision has two more calls besides `accept_changed_identity`:
+`pending_identity_changes()` returns the `PendingIdentityChange` list straight from the encrypted store, so
+it is complete after a restart (what [Identity & trust](identity-and-trust.md#pending-changes-survive-a-restart)
+describes), and the `IdentityChanged` failure carries the pinned and presented keys, so the client can show
+both safety numbers (`safety_number`) and pass the presented key back. `accept_changed_identity` clears the
+record of the groups the device left for that key, so the client reads `left_group_ids` before calling it.
+The client's `CryptoEngine.pendingIdentityChanges` / `acceptChangedIdentity` map to them.
+
+Two methods drop a group and differ in what survives: `reset_group` keeps the decrypted message cache
+(for a group the device will rejoin), `delete_group` clears it too (the channel or this device's membership
+is gone). The client's `CryptoEngine.resetGroup` / `deleteGroup` map to them; see
+[Groups & messages](groups-and-messages.md#resetting-and-deleting).
+
 `api/attachment.rs` holds the [attachment](attachments.md) functions, also free-standing because a
 file's key is its own rather than the session's: `encrypt_attachment_file`, `decrypt_attachment_file`,
 `encrypt_attachment_bytes`, `decrypt_attachment_bytes` (async, on the bridge's thread pool, since they do
@@ -41,7 +54,8 @@ them into sealed classes for the rest of the app to match on.
 
 | Type | `kind` field | Payload |
 |---|---|---|
-| `CryptoFailure` | `CryptoFailureKind` | `message`, and `user_id` when `kind` is `IdentityChanged` |
+| `CryptoFailure` | `CryptoFailureKind` | `message`, and `user_id`, `pinned_key` and `presented_key` when `kind` is `IdentityChanged` |
+| `PendingIdentityChange` | — | A plain record, no `kind`: `user_id`, `pinned_key` (optional), `presented_key`, `held_messages`, `held_group_ids`, `left_group_ids` |
 | `ProcessedMessage` | `ProcessedKind` | `sender`/`payload` for `Application`, `added`/`removed`/`removed_self` for `Commit`; `epoch` on both |
 
 Keep this shape for new bridge types: a `kind` enum plus fields that are meaningful only for some of its
@@ -49,18 +63,19 @@ values, documented per-field like the two above, rather than a Rust enum with da
 
 ## Errors
 
-`CryptoFailure { kind: CryptoFailureKind, message: String, user_id: Option<String> }` is built with
-`From<CryptoError>`:
+`CryptoFailure { kind: CryptoFailureKind, message: String, user_id: Option<String>, pinned_key:
+Option<Vec<u8>>, presented_key: Option<Vec<u8>> }` is built with `From<CryptoError>`:
 
-| `CryptoError` | `CryptoFailureKind` | `user_id` |
-|---|---|---|
-| `StoreLocked` | `StoreLocked` | — |
-| `IdentityChanged { user_id }` | `IdentityChanged` | set |
-| `BackupLocked` | `BackupLocked` | — |
-| `Verification(_)` | `Verification` | — |
-| `NotFound(_)` | `NotFound` | — |
-| `Malformed(_)` | `Malformed` | — |
-| `Store(_)`, `Io(_)`, `Mls(_)` | `Other` | — |
+| `CryptoError` | `CryptoFailureKind` | `user_id`, `presented_key` | `pinned_key` |
+|---|---|---|---|
+| `StoreLocked` | `StoreLocked` | — | — |
+| `IdentityChanged { user_id, pinned_key, presented_key }` | `IdentityChanged` | set | set unless the device has no pin |
+| `BackupLocked` | `BackupLocked` | — | — |
+| `Verification(_)` | `Verification` | — | — |
+| `NotFound(_)` | `NotFound` | — | — |
+| `Malformed(_)` | `Malformed` | — | — |
+| `ResyncRequired` | `ResyncRequired` | — | — |
+| `Store(_)`, `Io(_)`, `Mls(_)` | `Other` | — | — |
 
 `message` is always `error.to_string()` — for logs, never for the UI to parse (same rule as
 `CryptoError` itself). The client's `CryptoEngine` turns this into `CryptoException` with a

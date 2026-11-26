@@ -50,8 +50,8 @@ What binds the three together is not code but byte formats: everything in
 - **Stack:** Rust (edition 2024), a Cargo workspace. OpenMLS 0.9, RustCrypto primitives, SQLCipher via
   `rusqlite`, flutter_rust_bridge 2.13.0.
 - **Ciphersuite:** `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`, in the constant `CIPHERSUITE`.
-- **Shape:** one `Session` per server profile on a device; one MLS group per channel, whose group id is
-  the channel's UUID.
+- **Shape:** one `Session` per server profile on a device; one MLS group per channel at a time, whose group
+  id is the channel's UUID (followed by its generation once the channel's group has been replaced).
 - **No networking.** The core produces and consumes bytes; the caller delivers them.
 - **Who uses it:** [RaindropClient](../../RaindropClient/docs/crypto.md) compiles the bridge crate into
   the app. [RaindropServer](../../RaindropServer/docs/e2ee.md) reads the formats in

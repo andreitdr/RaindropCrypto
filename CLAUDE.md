@@ -132,7 +132,8 @@ Full reference: [`docs/architecture-overview.md`](docs/architecture-overview.md)
 
 - **One `Session` per server profile per device.** Its store is one SQLCipher file; `Store` and the
   OpenMLS storage provider each hold a connection to it (WAL lets them coexist).
-- **Every channel is one MLS group**, whose group id is the channel UUID. The ciphersuite is
+- **Every channel is one MLS group**, whose group id is the channel UUID (followed by the
+  8-byte big-endian generation once the group has been replaced). The ciphersuite is
   `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`, kept in the single constant `CIPHERSUITE`.
 - **Identity is a certificate, not an MLS feature.** MLS authenticates signature keys only. Who a key
   belongs to is answered by the `DeviceCertificate` in the leaf's credential, checked by a
@@ -148,7 +149,7 @@ Full reference: [`docs/architecture-overview.md`](docs/architecture-overview.md)
 - **All randomness goes through `random::bytes`**, so every key comes from one place.
 - **Formats are versioned and domain-separated.** Each has a version byte and, where signed or hashed,
   a context string (`raindrop/device-certificate/v1\n`, `raindrop/session-binding/v1\n`,
-  `raindrop/device-link/v1\n`, `raindrop/attachment/v1\n`). A new version is a new context, not a change to the old one.
+  `raindrop/device-pairing/v2\n`, `raindrop/device-link/v2\n`, `raindrop/attachment/v1\n`). A new version is a new context, not a change to the old one.
 - **Errors are coarse on purpose.** `CryptoError` variants say *what kind* of failure it was; the detail
   string is for logs and is never parsed. The bridge maps them to `CryptoFailureKind`, which the Dart
   side branches on.
@@ -170,9 +171,9 @@ behaviour should be a swappable seam rather than a hard-coded branch:
 
 ## Testing
 
-`cargo test` runs 31 unit tests (store, certificates, backup, link, root, pairing, attachments), 27 camera-effects
+`cargo test` runs 40 unit tests (store, certificates, backup, link, root, pairing, attachments), 29 camera-effects
 tests in `crates/raindrop_video/tests/effects.rs` (four of them only with the segmentation model
-present) plus two in `blur.rs` over its reciprocal division, and 18 integration tests in
+present) plus two in `blur.rs` over its reciprocal division, and 38 integration tests in
 `crates/raindrop_crypto/tests/session.rs`, which drive several devices, each with its own encrypted
 store on disk, exchanging the bytes a delivery service would carry. Add multi-device behaviour there.
 The client has Dart tests that load the built library, and an integration test against a live server;

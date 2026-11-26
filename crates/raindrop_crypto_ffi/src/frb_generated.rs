@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
                     default_rust_auto_opaque = RustAutoOpaqueMoi,
                 );
                 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-                pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 470252653;
+                pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -997038367;
             
 
 // Section: executor
@@ -94,7 +94,8 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoSession>>>::sse_decode(&mut deserializer);
 let api_offer = <Vec<u8>>::sse_decode(&mut deserializer);
-let api_commitment = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
+let api_commitment = <Vec<u8>>::sse_decode(&mut deserializer);
+let api_code_secret = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
                     transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
                         let mut api_that_guard = None;
 let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false)]);
@@ -105,7 +106,7 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
             }
         }
         let api_that_guard = api_that_guard.unwrap();
- let output_ok = crate::api::session::CryptoSession::approve_device_link(&*api_that_guard, api_offer, api_commitment)?;   std::result::Result::Ok(output_ok)
+ let output_ok = crate::api::session::CryptoSession::approve_device_link(&*api_that_guard, api_offer, api_commitment, api_code_secret)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__session__CryptoSession_begin_device_link_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
@@ -487,6 +488,7 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
             let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoSession>>>::sse_decode(&mut deserializer);
+let api_expected_group_id = <Vec<u8>>::sse_decode(&mut deserializer);
 let api_group_info = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
                     transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
                         let mut api_that_guard = None;
@@ -498,7 +500,7 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
             }
         }
         let api_that_guard = api_that_guard.unwrap();
- let output_ok = crate::api::session::CryptoSession::join_by_external_commit(&*api_that_guard, api_group_info)?;   std::result::Result::Ok(output_ok)
+ let output_ok = crate::api::session::CryptoSession::join_by_external_commit(&*api_that_guard, api_expected_group_id, api_group_info)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__session__CryptoSession_join_from_welcome_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
@@ -586,6 +588,24 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
 let api_key = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
                     transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
                          let output_ok = crate::api::session::CryptoSession::open(api_path, api_key)?;   std::result::Result::Ok(output_ok)
+                    })())
+                } })
+            }fn wire__crate__api__session__CryptoSession_pending_identity_changes_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
+                FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec,_,_>(flutter_rust_bridge::for_generated::TaskInfo{ debug_name: "CryptoSession_pending_identity_changes", port: Some(port_), mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal }, move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoSession>>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
+                    transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
+                        let mut api_that_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false)]);
+        for i in decode_indices_ {
+            match i {
+                0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                _ => unreachable!(),
+            }
+        }
+        let api_that_guard = api_that_guard.unwrap();
+ let output_ok = crate::api::session::CryptoSession::pending_identity_changes(&*api_that_guard)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__session__CryptoSession_pinned_identity_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
@@ -687,6 +707,25 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
         }
         let api_that_guard = api_that_guard.unwrap();
  let output_ok = crate::api::session::CryptoSession::remove_members(&*api_that_guard, api_group_id, api_leaf_indices)?;   std::result::Result::Ok(output_ok)
+                    })())
+                } })
+            }fn wire__crate__api__session__CryptoSession_reset_group_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
+                FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec,_,_>(flutter_rust_bridge::for_generated::TaskInfo{ debug_name: "CryptoSession_reset_group", port: Some(port_), mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal }, move || {
+            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
+            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoSession>>>::sse_decode(&mut deserializer);
+let api_group_id = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
+                    transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
+                        let mut api_that_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false)]);
+        for i in decode_indices_ {
+            match i {
+                0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                _ => unreachable!(),
+            }
+        }
+        let api_that_guard = api_that_guard.unwrap();
+ let output_ok = crate::api::session::CryptoSession::reset_group(&*api_that_guard, api_group_id)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__session__CryptoSession_restore_identity_with_passphrase_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
@@ -870,9 +909,10 @@ let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decod
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_offer = <Vec<u8>>::sse_decode(&mut deserializer);
 let api_commitment = <Vec<u8>>::sse_decode(&mut deserializer);
+let api_code_secret = <Vec<u8>>::sse_decode(&mut deserializer);
 let api_payload = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
                     transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
-                         let output_ok = crate::api::identity::approve_pairing(api_offer, api_commitment, api_payload)?;   std::result::Result::Ok(output_ok)
+                         let output_ok = crate::api::identity::approve_pairing(api_offer, api_commitment, api_code_secret, api_payload)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__attachment__attachment_ciphertext_length_impl(ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
@@ -907,9 +947,10 @@ let api_platform = <String>::sse_decode(&mut deserializer);deserializer.end(); m
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_approval = <Vec<u8>>::sse_decode(&mut deserializer);
 let api_offer = <Vec<u8>>::sse_decode(&mut deserializer);
-let api_exchange_secret = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
+let api_exchange_secret = <Vec<u8>>::sse_decode(&mut deserializer);
+let api_code_secret = <Vec<u8>>::sse_decode(&mut deserializer);deserializer.end(); move |context|  {
                     transform_result_sse::<_, crate::api::session::CryptoFailure>((move ||  {
-                         let output_ok = crate::api::identity::complete_pairing(api_approval, api_offer, api_exchange_secret)?;   std::result::Result::Ok(output_ok)
+                         let output_ok = crate::api::identity::complete_pairing(api_approval, api_offer, api_exchange_secret, api_code_secret)?;   std::result::Result::Ok(output_ok)
                     })())
                 } })
             }fn wire__crate__api__attachment__decrypt_attachment_bytes_impl(port_: flutter_rust_bridge::for_generated::MessagePort,ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,rust_vec_len_: i32,data_len_: i32)  {
@@ -1208,7 +1249,9 @@ return crate::api::session::CachedMessage{group_id: var_groupId, message_id: var
                     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut var_kind = <crate::api::session::CryptoFailureKind>::sse_decode(deserializer);
 let mut var_message = <String>::sse_decode(deserializer);
 let mut var_userId = <Option<String>>::sse_decode(deserializer);
-return crate::api::session::CryptoFailure{kind: var_kind, message: var_message, user_id: var_userId};}
+let mut var_pinnedKey = <Option<Vec<u8>>>::sse_decode(deserializer);
+let mut var_presentedKey = <Option<Vec<u8>>>::sse_decode(deserializer);
+return crate::api::session::CryptoFailure{kind: var_kind, message: var_message, user_id: var_userId, pinned_key: var_pinnedKey, presented_key: var_presentedKey};}
                 }
                 
                 impl SseDecode for crate::api::session::CryptoFailureKind {
@@ -1221,7 +1264,8 @@ return crate::api::session::CryptoFailure{kind: var_kind, message: var_message, 
 3 => crate::api::session::CryptoFailureKind::Verification,
 4 => crate::api::session::CryptoFailureKind::NotFound,
 5 => crate::api::session::CryptoFailureKind::Malformed,
-6 => crate::api::session::CryptoFailureKind::Other,
+6 => crate::api::session::CryptoFailureKind::ResyncRequired,
+7 => crate::api::session::CryptoFailureKind::Other,
             _ => unreachable!("Invalid variant for CryptoFailureKind: {}", inner),
         };}
                 }
@@ -1277,7 +1321,8 @@ return crate::api::session::GroupMember{leaf_index: var_leafIndex, user_id: var_
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut var_offer = <Vec<u8>>::sse_decode(deserializer);
 let mut var_commitment = <Vec<u8>>::sse_decode(deserializer);
-return crate::api::session::LinkOffer{offer: var_offer, commitment: var_commitment};}
+let mut var_codeSecret = <Vec<u8>>::sse_decode(deserializer);
+return crate::api::session::LinkOffer{offer: var_offer, commitment: var_commitment, code_secret: var_codeSecret};}
                 }
                 
                 impl SseDecode for Vec<crate::api::session::CachedMessage> {
@@ -1301,6 +1346,14 @@ return crate::api::session::LinkOffer{offer: var_offer, commitment: var_commitme
                     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ { ans_.push(<Vec<u8>>::sse_decode(deserializer)); }
+        return ans_;}
+                }
+                
+                impl SseDecode for Vec<crate::api::session::PendingIdentityChange> {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ { ans_.push(<crate::api::session::PendingIdentityChange>::sse_decode(deserializer)); }
         return ans_;}
                 }
                 
@@ -1402,8 +1455,9 @@ return crate::api::identity::NewRecovery{words: var_words, seed: var_seed};}
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut var_offer = <Vec<u8>>::sse_decode(deserializer);
 let mut var_commitment = <Vec<u8>>::sse_decode(deserializer);
+let mut var_codeSecret = <Vec<u8>>::sse_decode(deserializer);
 let mut var_exchangeSecret = <Vec<u8>>::sse_decode(deserializer);
-return crate::api::identity::PairingOffer{offer: var_offer, commitment: var_commitment, exchange_secret: var_exchangeSecret};}
+return crate::api::identity::PairingOffer{offer: var_offer, commitment: var_commitment, code_secret: var_codeSecret, exchange_secret: var_exchangeSecret};}
                 }
                 
                 impl SseDecode for crate::api::identity::PairingOfferInfo {
@@ -1419,6 +1473,17 @@ return crate::api::identity::PairingOfferInfo{device_name: var_deviceName, platf
 let mut var_welcome = <Option<Vec<u8>>>::sse_decode(deserializer);
 let mut var_epochAfter = <i64>::sse_decode(deserializer);
 return crate::api::session::PendingCommit{commit: var_commit, welcome: var_welcome, epoch_after: var_epochAfter};}
+                }
+                
+                impl SseDecode for crate::api::session::PendingIdentityChange {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {let mut var_userId = <String>::sse_decode(deserializer);
+let mut var_pinnedKey = <Option<Vec<u8>>>::sse_decode(deserializer);
+let mut var_presentedKey = <Vec<u8>>::sse_decode(deserializer);
+let mut var_heldMessages = <u32>::sse_decode(deserializer);
+let mut var_heldGroupIds = <Vec<Vec<u8>>>::sse_decode(deserializer);
+let mut var_leftGroupIds = <Vec<Vec<u8>>>::sse_decode(deserializer);
+return crate::api::session::PendingIdentityChange{user_id: var_userId, pinned_key: var_pinnedKey, presented_key: var_presentedKey, held_messages: var_heldMessages, held_group_ids: var_heldGroupIds, left_group_ids: var_leftGroupIds};}
                 }
                 
                 impl SseDecode for crate::api::session::PinnedIdentity {
@@ -1581,45 +1646,47 @@ return crate::api::video::VideoFailure{kind: var_kind, message: var_message};}
 26 => wire__crate__api__session__CryptoSession_members_impl(port, ptr, rust_vec_len, data_len),
 27 => wire__crate__api__session__CryptoSession_merge_pending_commit_impl(port, ptr, rust_vec_len, data_len),
 28 => wire__crate__api__session__CryptoSession_open_impl(port, ptr, rust_vec_len, data_len),
-29 => wire__crate__api__session__CryptoSession_pinned_identity_impl(port, ptr, rust_vec_len, data_len),
-30 => wire__crate__api__session__CryptoSession_process_impl(port, ptr, rust_vec_len, data_len),
-31 => wire__crate__api__session__CryptoSession_receive_message_impl(port, ptr, rust_vec_len, data_len),
-32 => wire__crate__api__session__CryptoSession_remember_sent_impl(port, ptr, rust_vec_len, data_len),
-33 => wire__crate__api__session__CryptoSession_remove_members_impl(port, ptr, rust_vec_len, data_len),
-34 => wire__crate__api__session__CryptoSession_restore_identity_with_passphrase_impl(port, ptr, rust_vec_len, data_len),
-35 => wire__crate__api__session__CryptoSession_restore_identity_with_recovery_key_impl(port, ptr, rust_vec_len, data_len),
-36 => wire__crate__api__session__CryptoSession_seal_backup_with_passphrase_impl(port, ptr, rust_vec_len, data_len),
-37 => wire__crate__api__session__CryptoSession_seal_backup_with_recovery_key_impl(port, ptr, rust_vec_len, data_len),
-38 => wire__crate__api__session__CryptoSession_self_update_impl(port, ptr, rust_vec_len, data_len),
-39 => wire__crate__api__session__CryptoSession_sign_auth_challenge_impl(port, ptr, rust_vec_len, data_len),
-40 => wire__crate__api__session__CryptoSession_sign_message_attestation_impl(port, ptr, rust_vec_len, data_len),
-41 => wire__crate__api__session__CryptoSession_sign_message_attestation_v2_impl(port, ptr, rust_vec_len, data_len),
-42 => wire__crate__api__session__CryptoSession_sign_session_challenge_impl(port, ptr, rust_vec_len, data_len),
-43 => wire__crate__api__identity__approve_pairing_impl(port, ptr, rust_vec_len, data_len),
-46 => wire__crate__api__identity__begin_pairing_impl(port, ptr, rust_vec_len, data_len),
-47 => wire__crate__api__identity__complete_pairing_impl(port, ptr, rust_vec_len, data_len),
-48 => wire__crate__api__attachment__decrypt_attachment_bytes_impl(port, ptr, rust_vec_len, data_len),
-49 => wire__crate__api__attachment__decrypt_attachment_file_impl(port, ptr, rust_vec_len, data_len),
-50 => wire__crate__api__identity__derive_account_impl(port, ptr, rust_vec_len, data_len),
-51 => wire__crate__api__attachment__encrypt_attachment_bytes_impl(port, ptr, rust_vec_len, data_len),
-52 => wire__crate__api__attachment__encrypt_attachment_file_impl(port, ptr, rust_vec_len, data_len),
-53 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-54 => wire__crate__api__identity__new_recovery_key_impl(port, ptr, rust_vec_len, data_len),
-55 => wire__crate__api__identity__new_root_secret_impl(port, ptr, rust_vec_len, data_len),
-56 => wire__crate__api__identity__open_root_impl(port, ptr, rust_vec_len, data_len),
-57 => wire__crate__api__identity__open_vault_impl(port, ptr, rust_vec_len, data_len),
-58 => wire__crate__api__identity__open_with_pin_impl(port, ptr, rust_vec_len, data_len),
-59 => wire__crate__api__identity__read_pairing_offer_impl(port, ptr, rust_vec_len, data_len),
-60 => wire__crate__api__identity__recovery_lookup_id_impl(port, ptr, rust_vec_len, data_len),
-61 => wire__crate__api__identity__recovery_seed_from_words_impl(port, ptr, rust_vec_len, data_len),
-63 => wire__crate__api__identity__seal_root_impl(port, ptr, rust_vec_len, data_len),
-64 => wire__crate__api__identity__seal_vault_impl(port, ptr, rust_vec_len, data_len),
-65 => wire__crate__api__identity__seal_with_pin_impl(port, ptr, rust_vec_len, data_len),
-67 => wire__crate__api__video__video_effects_create_impl(port, ptr, rust_vec_len, data_len),
-68 => wire__crate__api__video__video_effects_destroy_impl(port, ptr, rust_vec_len, data_len),
-70 => wire__crate__api__video__video_effects_set_background_file_impl(port, ptr, rust_vec_len, data_len),
-71 => wire__crate__api__video__video_effects_stats_impl(port, ptr, rust_vec_len, data_len),
-72 => wire__crate__api__video__video_effects_update_impl(port, ptr, rust_vec_len, data_len),
+29 => wire__crate__api__session__CryptoSession_pending_identity_changes_impl(port, ptr, rust_vec_len, data_len),
+30 => wire__crate__api__session__CryptoSession_pinned_identity_impl(port, ptr, rust_vec_len, data_len),
+31 => wire__crate__api__session__CryptoSession_process_impl(port, ptr, rust_vec_len, data_len),
+32 => wire__crate__api__session__CryptoSession_receive_message_impl(port, ptr, rust_vec_len, data_len),
+33 => wire__crate__api__session__CryptoSession_remember_sent_impl(port, ptr, rust_vec_len, data_len),
+34 => wire__crate__api__session__CryptoSession_remove_members_impl(port, ptr, rust_vec_len, data_len),
+35 => wire__crate__api__session__CryptoSession_reset_group_impl(port, ptr, rust_vec_len, data_len),
+36 => wire__crate__api__session__CryptoSession_restore_identity_with_passphrase_impl(port, ptr, rust_vec_len, data_len),
+37 => wire__crate__api__session__CryptoSession_restore_identity_with_recovery_key_impl(port, ptr, rust_vec_len, data_len),
+38 => wire__crate__api__session__CryptoSession_seal_backup_with_passphrase_impl(port, ptr, rust_vec_len, data_len),
+39 => wire__crate__api__session__CryptoSession_seal_backup_with_recovery_key_impl(port, ptr, rust_vec_len, data_len),
+40 => wire__crate__api__session__CryptoSession_self_update_impl(port, ptr, rust_vec_len, data_len),
+41 => wire__crate__api__session__CryptoSession_sign_auth_challenge_impl(port, ptr, rust_vec_len, data_len),
+42 => wire__crate__api__session__CryptoSession_sign_message_attestation_impl(port, ptr, rust_vec_len, data_len),
+43 => wire__crate__api__session__CryptoSession_sign_message_attestation_v2_impl(port, ptr, rust_vec_len, data_len),
+44 => wire__crate__api__session__CryptoSession_sign_session_challenge_impl(port, ptr, rust_vec_len, data_len),
+45 => wire__crate__api__identity__approve_pairing_impl(port, ptr, rust_vec_len, data_len),
+48 => wire__crate__api__identity__begin_pairing_impl(port, ptr, rust_vec_len, data_len),
+49 => wire__crate__api__identity__complete_pairing_impl(port, ptr, rust_vec_len, data_len),
+50 => wire__crate__api__attachment__decrypt_attachment_bytes_impl(port, ptr, rust_vec_len, data_len),
+51 => wire__crate__api__attachment__decrypt_attachment_file_impl(port, ptr, rust_vec_len, data_len),
+52 => wire__crate__api__identity__derive_account_impl(port, ptr, rust_vec_len, data_len),
+53 => wire__crate__api__attachment__encrypt_attachment_bytes_impl(port, ptr, rust_vec_len, data_len),
+54 => wire__crate__api__attachment__encrypt_attachment_file_impl(port, ptr, rust_vec_len, data_len),
+55 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+56 => wire__crate__api__identity__new_recovery_key_impl(port, ptr, rust_vec_len, data_len),
+57 => wire__crate__api__identity__new_root_secret_impl(port, ptr, rust_vec_len, data_len),
+58 => wire__crate__api__identity__open_root_impl(port, ptr, rust_vec_len, data_len),
+59 => wire__crate__api__identity__open_vault_impl(port, ptr, rust_vec_len, data_len),
+60 => wire__crate__api__identity__open_with_pin_impl(port, ptr, rust_vec_len, data_len),
+61 => wire__crate__api__identity__read_pairing_offer_impl(port, ptr, rust_vec_len, data_len),
+62 => wire__crate__api__identity__recovery_lookup_id_impl(port, ptr, rust_vec_len, data_len),
+63 => wire__crate__api__identity__recovery_seed_from_words_impl(port, ptr, rust_vec_len, data_len),
+65 => wire__crate__api__identity__seal_root_impl(port, ptr, rust_vec_len, data_len),
+66 => wire__crate__api__identity__seal_vault_impl(port, ptr, rust_vec_len, data_len),
+67 => wire__crate__api__identity__seal_with_pin_impl(port, ptr, rust_vec_len, data_len),
+69 => wire__crate__api__video__video_effects_create_impl(port, ptr, rust_vec_len, data_len),
+70 => wire__crate__api__video__video_effects_destroy_impl(port, ptr, rust_vec_len, data_len),
+72 => wire__crate__api__video__video_effects_set_background_file_impl(port, ptr, rust_vec_len, data_len),
+73 => wire__crate__api__video__video_effects_stats_impl(port, ptr, rust_vec_len, data_len),
+74 => wire__crate__api__video__video_effects_update_impl(port, ptr, rust_vec_len, data_len),
                         _ => unreachable!(),
                     }
                 }
@@ -1632,11 +1699,11 @@ return crate::api::video::VideoFailure{kind: var_kind, message: var_message};}
                 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
                     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
                     match func_id {
-                        44 => wire__crate__api__attachment__attachment_ciphertext_length_impl(ptr, rust_vec_len, data_len),
-45 => wire__crate__api__session__backup_needs_passphrase_impl(ptr, rust_vec_len, data_len),
-62 => wire__crate__api__session__safety_number_impl(ptr, rust_vec_len, data_len),
-66 => wire__crate__api__video__video_effects_capabilities_impl(ptr, rust_vec_len, data_len),
-69 => wire__crate__api__video__video_effects_process_address_impl(ptr, rust_vec_len, data_len),
+                        46 => wire__crate__api__attachment__attachment_ciphertext_length_impl(ptr, rust_vec_len, data_len),
+47 => wire__crate__api__session__backup_needs_passphrase_impl(ptr, rust_vec_len, data_len),
+64 => wire__crate__api__session__safety_number_impl(ptr, rust_vec_len, data_len),
+68 => wire__crate__api__video__video_effects_capabilities_impl(ptr, rust_vec_len, data_len),
+71 => wire__crate__api__video__video_effects_process_address_impl(ptr, rust_vec_len, data_len),
                         _ => unreachable!(),
                     }
                 }
@@ -1685,7 +1752,9 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::session::CachedMessage> for c
                     [
                     self.kind.into_into_dart().into_dart(),
 self.message.into_into_dart().into_dart(),
-self.user_id.into_into_dart().into_dart()
+self.user_id.into_into_dart().into_dart(),
+self.pinned_key.into_into_dart().into_dart(),
+self.presented_key.into_into_dart().into_dart()
                 ].into_dart()
                 }
             }
@@ -1705,7 +1774,8 @@ Self::BackupLocked => 2.into_dart(),
 Self::Verification => 3.into_dart(),
 Self::NotFound => 4.into_dart(),
 Self::Malformed => 5.into_dart(),
-Self::Other => 6.into_dart(),
+Self::ResyncRequired => 6.into_dart(),
+Self::Other => 7.into_dart(),
                     _ => unreachable!(),
                 }
                 }
@@ -1785,7 +1855,8 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::session::GroupMember> for cra
                 fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
                     [
                     self.offer.into_into_dart().into_dart(),
-self.commitment.into_into_dart().into_dart()
+self.commitment.into_into_dart().into_dart(),
+self.code_secret.into_into_dart().into_dart()
                 ].into_dart()
                 }
             }
@@ -1816,6 +1887,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::identity::NewRecovery> for cr
                     [
                     self.offer.into_into_dart().into_dart(),
 self.commitment.into_into_dart().into_dart(),
+self.code_secret.into_into_dart().into_dart(),
 self.exchange_secret.into_into_dart().into_dart()
                 ].into_dart()
                 }
@@ -1854,6 +1926,25 @@ self.epoch_after.into_into_dart().into_dart()
             impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::session::PendingCommit {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::session::PendingCommit> for crate::api::session::PendingCommit {
             fn into_into_dart(self) -> crate::api::session::PendingCommit {
+                self
+            }
+        }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+            impl flutter_rust_bridge::IntoDart for crate::api::session::PendingIdentityChange {
+                fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+                    [
+                    self.user_id.into_into_dart().into_dart(),
+self.pinned_key.into_into_dart().into_dart(),
+self.presented_key.into_into_dart().into_dart(),
+self.held_messages.into_into_dart().into_dart(),
+self.held_group_ids.into_into_dart().into_dart(),
+self.left_group_ids.into_into_dart().into_dart()
+                ].into_dart()
+                }
+            }
+            impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::session::PendingIdentityChange {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::session::PendingIdentityChange> for crate::api::session::PendingIdentityChange {
+            fn into_into_dart(self) -> crate::api::session::PendingIdentityChange {
                 self
             }
         }
@@ -2078,7 +2169,9 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::video::VideoFailureKind> for 
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<crate::api::session::CryptoFailureKind>::sse_encode(self.kind, serializer);
 <String>::sse_encode(self.message, serializer);
-<Option<String>>::sse_encode(self.user_id, serializer);}
+<Option<String>>::sse_encode(self.user_id, serializer);
+<Option<Vec<u8>>>::sse_encode(self.pinned_key, serializer);
+<Option<Vec<u8>>>::sse_encode(self.presented_key, serializer);}
                 }
                 
                 impl SseEncode for crate::api::session::CryptoFailureKind {
@@ -2089,7 +2182,8 @@ crate::api::session::CryptoFailureKind::BackupLocked => { 2 }
 crate::api::session::CryptoFailureKind::Verification => { 3 }
 crate::api::session::CryptoFailureKind::NotFound => { 4 }
 crate::api::session::CryptoFailureKind::Malformed => { 5 }
-crate::api::session::CryptoFailureKind::Other => { 6 }
+crate::api::session::CryptoFailureKind::ResyncRequired => { 6 }
+crate::api::session::CryptoFailureKind::Other => { 7 }
  _ => { unimplemented!(""); }}, serializer);}
                 }
                 
@@ -2139,7 +2233,8 @@ crate::api::session::CryptoFailureKind::Other => { 6 }
                 impl SseEncode for crate::api::session::LinkOffer {
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<Vec<u8>>::sse_encode(self.offer, serializer);
-<Vec<u8>>::sse_encode(self.commitment, serializer);}
+<Vec<u8>>::sse_encode(self.commitment, serializer);
+<Vec<u8>>::sse_encode(self.code_secret, serializer);}
                 }
                 
                 impl SseEncode for Vec<crate::api::session::CachedMessage> {
@@ -2158,6 +2253,12 @@ crate::api::session::CryptoFailureKind::Other => { 6 }
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<i32>::sse_encode(self.len() as _, serializer);
         for item in self { <Vec<u8>>::sse_encode(item, serializer); }}
+                }
+                
+                impl SseEncode for Vec<crate::api::session::PendingIdentityChange> {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<i32>::sse_encode(self.len() as _, serializer);
+        for item in self { <crate::api::session::PendingIdentityChange>::sse_encode(item, serializer); }}
                 }
                 
                 impl SseEncode for Vec<crate::api::session::PinnedIdentity> {
@@ -2244,6 +2345,7 @@ crate::api::session::CryptoFailureKind::Other => { 6 }
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<Vec<u8>>::sse_encode(self.offer, serializer);
 <Vec<u8>>::sse_encode(self.commitment, serializer);
+<Vec<u8>>::sse_encode(self.code_secret, serializer);
 <Vec<u8>>::sse_encode(self.exchange_secret, serializer);}
                 }
                 
@@ -2258,6 +2360,16 @@ crate::api::session::CryptoFailureKind::Other => { 6 }
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<Vec<u8>>::sse_encode(self.commit, serializer);
 <Option<Vec<u8>>>::sse_encode(self.welcome, serializer);
 <i64>::sse_encode(self.epoch_after, serializer);}
+                }
+                
+                impl SseEncode for crate::api::session::PendingIdentityChange {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<String>::sse_encode(self.user_id, serializer);
+<Option<Vec<u8>>>::sse_encode(self.pinned_key, serializer);
+<Vec<u8>>::sse_encode(self.presented_key, serializer);
+<u32>::sse_encode(self.held_messages, serializer);
+<Vec<Vec<u8>>>::sse_encode(self.held_group_ids, serializer);
+<Vec<Vec<u8>>>::sse_encode(self.left_group_ids, serializer);}
                 }
                 
                 impl SseEncode for crate::api::session::PinnedIdentity {

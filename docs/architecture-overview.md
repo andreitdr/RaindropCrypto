@@ -69,8 +69,9 @@ let ciphertext = session.encrypt(&group_id, b"hello")?;
 | Message attestations | `sign_message_attestation` (v1), `sign_message_attestation_v2` (a message carrying files) |
 | Linking | `begin_device_link`, `approve_device_link`, `complete_device_link` |
 | Key packages | `generate_key_packages` |
-| Groups | `create_group`, `has_group`, `epoch`, `members`, `group_info`, `add_members`, `remove_members`, `self_update`, `join_by_external_commit`, `join_from_welcome`, `merge_pending_commit`, `discard_pending_commit`, `delete_group` |
+| Groups | `create_group`, `has_group`, `epoch`, `members`, `group_info`, `add_members`, `remove_members`, `self_update`, `join_by_external_commit`, `join_from_welcome`, `merge_pending_commit`, `discard_pending_commit`, `reset_group`, `delete_group` |
 | Messages | `encrypt`, `process`, `receive_message`, `remember_sent`, `export_secret` |
+| Trust decisions | `accept_changed_identity`, `pending_identity_changes` |
 | Files (module `attachment`, not on `Session`) | `encrypt_file`, `decrypt_file`, `encrypt_bytes`, `decrypt_bytes`, `ciphertext_length` — see [Attachments](attachments.md) |
 
 A few things hold across all of them:
@@ -94,9 +95,10 @@ logs only.
 | `Store(String)` | Any other local database failure |
 | `Malformed(String)` | Input from the network or the user was not well formed |
 | `Verification(String)` | A signature, certificate or credential did not verify |
-| `IdentityChanged { user_id }` | A user's identity key differs from the pinned one. A trust decision for the user; never resolved silently |
+| `IdentityChanged { user_id, pinned_key, presented_key }` | A user's identity key differs from the pinned one; both keys are carried. A trust decision for the user; never resolved silently |
 | `BackupLocked` | Wrong recovery key or passphrase, or a damaged backup |
 | `NotFound(String)` | No group, key or identity with that name exists locally |
+| `ResyncRequired` | `process` was given a commit claiming to be this device's own that is not the one it holds as pending (discarded after the server took it, or forged). `reset_group` (keeps the cached messages) and rejoin; see [Groups & messages](groups-and-messages.md#commits-and-epochs) |
 | `Mls(String)` | An OpenMLS operation failed (the OpenMLS error type is wrapped as text) |
 
 The bridge maps these onto `CryptoFailureKind`; see [Flutter bridge](flutter-bridge.md#errors).

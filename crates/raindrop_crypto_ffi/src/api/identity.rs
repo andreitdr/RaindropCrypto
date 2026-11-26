@@ -24,11 +24,13 @@ pub struct NewRecovery {
     pub seed: Vec<u8>,
 }
 
-/// A new device's pairing offer (hand it to the relay), the commitment for the pairing code, and the
-/// secret to hold until the approval arrives.
+/// A new device's pairing offer (hand it to the relay), the commitment and code secret for the
+/// pairing code (the code secret never goes to the relay), and the secret to hold until the approval
+/// arrives.
 pub struct PairingOffer {
     pub offer: Vec<u8>,
     pub commitment: Vec<u8>,
+    pub code_secret: Vec<u8>,
     pub exchange_secret: Vec<u8>,
 }
 
@@ -108,6 +110,7 @@ pub fn begin_pairing(device_name: String, platform: String) -> Result<PairingOff
     Ok(PairingOffer {
         offer: begun.offer,
         commitment: begun.commitment.to_vec(),
+        code_secret: begun.code_secret.to_vec(),
         exchange_secret: begun.exchange_secret.to_vec(),
     })
 }
@@ -124,12 +127,18 @@ pub fn read_pairing_offer(offer: Vec<u8>, commitment: Vec<u8>) -> Result<Pairing
     })
 }
 
-/// Existing device: seals `payload` to the offer, after checking it against the pairing code.
-pub fn approve_pairing(offer: Vec<u8>, commitment: Vec<u8>, payload: Vec<u8>) -> Result<Vec<u8>> {
-    Ok(pairing::approve(&offer, &commitment, &payload)?)
+/// Existing device: seals `payload` to the offer and the pairing code's secret, after checking the
+/// offer against the pairing code.
+pub fn approve_pairing(offer: Vec<u8>, commitment: Vec<u8>, code_secret: Vec<u8>, payload: Vec<u8>) -> Result<Vec<u8>> {
+    Ok(pairing::approve(&offer, &commitment, &code_secret, &payload)?)
 }
 
 /// New device: opens the approval.
-pub fn complete_pairing(approval: Vec<u8>, offer: Vec<u8>, exchange_secret: Vec<u8>) -> Result<Vec<u8>> {
-    Ok(pairing::complete(&approval, &offer, &exchange_secret)?.to_vec())
+pub fn complete_pairing(
+    approval: Vec<u8>,
+    offer: Vec<u8>,
+    exchange_secret: Vec<u8>,
+    code_secret: Vec<u8>,
+) -> Result<Vec<u8>> {
+    Ok(pairing::complete(&approval, &offer, &exchange_secret, &code_secret)?.to_vec())
 }

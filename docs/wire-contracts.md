@@ -23,7 +23,9 @@ version: u8 = 1 | user_id | device_id | device_signature_key | user_identity_key
 | created_at_unix: i64 (be) | signature
 ```
 
-Every non-fixed field is length-prefixed: `u16` big-endian length, then that many bytes. `user_id` and
+Every non-fixed field is length-prefixed: `u16` big-endian length, then that many bytes. A field longer than
+65,535 bytes cannot be encoded: `to_bytes` (and `certify_device`, and `Offer::to_bytes` for pairing and
+linking) return `Malformed` rather than truncating the length. `user_id` and
 `device_id` are UTF-8 text — UUIDs in practice, but the *exact text the client wrote* is what is signed
 and what the server compares, never a re-formatted `Guid`, because re-formatting (case, hyphenation)
 would break the signature. `signature` is Ed25519 by `user_identity_key` over everything up to
@@ -60,6 +62,11 @@ Defined in `root.rs` and `pairing.rs`; layouts in [Root identity](root-identity.
 server stores and relays them as opaque bytes and never parses them. The sealed root is stored under
 `RecoverySeed::lookup_id` (32 lowercase hex characters), which the server treats as an opaque name.
 
+The pairing approval is version 2 (`"raindrop/device-pairing/v2\n"`): its key is salted with a 16-byte
+code secret that travels only in the pairing code (`RDP2-<pairing id>-<commitment>-<code secret>`, both
+in base32), never to the server, so a relay cannot seal an approval of its own. The server sees only the
+pairing id; nothing it stores or checks depends on the code's layout.
+
 ## Message attestation
 
 A device signs every message it sends so a recipient can later prove to moderators who wrote it
@@ -82,13 +89,15 @@ Two formats, both in `link.rs`:
   device_signature_key | exchange_key: 32 bytes`, same length-prefix convention as the certificate.
   Uploaded as-is; the server stores and relays it without reading it as anything but bytes
   (`POST /api/e2ee/device-link/start` / `offer`).
-- **Link code**: `RDL1-<link id>-<commitment>`, where `<link id>` comes from the server and
-  `<commitment>` is `link::commitment(offer)`: the first 16 bytes of `SHA-256("raindrop/device-link/v1\n"
-  ‖ offer)`. The prefix `RDL1` is the only part either side parses as a literal; the rest is opaque to
-  the server.
-- **Approval** (`seal_approval` / `open_approval`): `version: u8 = 1 | sender_public_key: 32 bytes |
-  nonce: 24 bytes | XChaCha20-Poly1305 ciphertext`. The server stores and relays it as an opaque blob
-  (`POST /api/e2ee/device-link/approve` / `approval`), up to 8 KiB.
+- **Link code**: `RDL2-<link id>-<commitment>-<code secret>`, where `<link id>` comes from the server,
+  `<commitment>` is `link::commitment(offer)`: the first 16 bytes of `SHA-256("raindrop/device-link/v2\n"
+  ‖ offer)`, and `<code secret>` is 16 random bytes from `begin_device_link` that are never uploaded.
+  Both are base32. The prefix `RDL2` is the only part either side parses as a literal; the rest is
+  opaque to the server, which only ever receives the link id.
+- **Approval** (`seal_approval` / `open_approval`): `version: u8 = 2 | sender_public_key: 32 bytes |
+  nonce: 24 bytes | XChaCha20-Poly1305 ciphertext`, its key salted with the code secret. The server
+  stores and relays it as an opaque blob (`POST /api/e2ee/device-link/approve` / `approval`), up to
+  8 KiB; the size is unchanged from version 1.
 
 Full detail: [Device linking](device-linking.md).
 
@@ -119,8 +128,12 @@ client's upload code, which declares the ciphertext length before uploading.
 ## MLS group id
 
 Not a byte format this crate parses, but a convention it depends on: **a channel's MLS group id is the
-channel's UUID as 16 big-endian bytes**. The client computes it with `groupIdForChannel(channelId)`
-(`Guid.ToByteArray(bigEndian: true)` on the server's side, for anything that needs to agree with it).
+channel's UUID as 16 big-endian bytes**, followed — for any generation of the channel's group after 0 — by
+the generation as 8 big-endian bytes (24 bytes in all). The client computes it with
+`groupIdForChannel(channelId, generation)`, the server with `MlsFraming.GroupIdFor(channelId, generation)`
+(`Guid.ToByteArray(bigEndian: true)` for the first 16), and the server checks every commit, group info and
+encrypted message against the channel's current generation. Both sides' tests pin the same vector
+(`00112233-4455-6677-8899-aabbccddeeff`, generation `0x0102030405`).
 `Session` treats group ids as opaque bytes and does not enforce this — the convention lives in the
 caller, so a change here is a client-only change, but any two sides that compute a group id independently
 (the app on two platforms, say) must compute it identically.
