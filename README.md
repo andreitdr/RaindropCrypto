@@ -54,5 +54,5 @@ The Flutter app builds this crate by itself through `RaindropClient/native/raind
 - **Extension point.** `validation::CredentialValidator` decides whether a group member is who they
   claim to be. The default is `PinnedIdentityValidator`; a plugin supplying stricter rules needs the
   injection seam that is not built yet — see [Roadmap](docs/roadmap.md).
-- **CI.** Build and test on every push to `main`; a `vX.Y.Z.T` tag publishes prebuilt libraries the
+- **CI.** Build and test on every push to `main`; a `vYY.M.P` tag publishes prebuilt libraries the
   client does not use (it builds from source). See [CI & releases](docs/ci-and-releases.md).
