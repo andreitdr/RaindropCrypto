@@ -255,6 +255,31 @@ fn a_stride_narrower_than_its_plane_is_refused() {
 }
 
 #[test]
+#[should_panic(expected = "row out of range")]
+fn a_luma_row_past_the_picture_panics() {
+    let mut y = vec![0u8; 16];
+    let mut u = vec![0u8; 4];
+    let mut v = vec![0u8; 4];
+    let frame = I420FrameMut::from_slices(&mut y, 4, &mut u, 2, &mut v, 2, 4, 4).expect("a 4x4 frame");
+
+    // Height is 4, so row 4 is one past the end of the luma plane. A safe
+    // accessor must refuse it in release builds too, not read past the plane.
+    let _ = frame.row(Plane::Y, 4);
+}
+
+#[test]
+#[should_panic(expected = "row out of range")]
+fn a_chroma_row_past_the_picture_panics() {
+    let mut y = vec![0u8; 16];
+    let mut u = vec![0u8; 4];
+    let mut v = vec![0u8; 4];
+    let mut frame = I420FrameMut::from_slices(&mut y, 4, &mut u, 2, &mut v, 2, 4, 4).expect("a 4x4 frame");
+
+    // A 4x4 picture has 2 chroma rows, so row 2 is past the end of the U plane.
+    let _ = frame.row_mut(Plane::U, frame.chroma_height());
+}
+
+#[test]
 fn odd_dimensions_do_not_panic() {
     // I420's chroma planes are half-size rounded *up*, and every off-by-one in
     // this crate lives in that rounding.

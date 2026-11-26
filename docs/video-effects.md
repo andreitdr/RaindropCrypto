@@ -76,7 +76,9 @@ pub type ProcessI420 = unsafe extern "C" fn(
 
 `0` means the frame was processed; every negative value means it was left
 *exactly* as it arrived — `-1` bad dimensions, `-2` a frame
-`I420FrameMut::new` would not accept, `-3` effects busy or the handle gone.
+`I420FrameMut::new` would not accept, `-3` effects busy or the handle gone,
+`-5` the processor panicked (caught with `catch_unwind` in `c_api::guarded`, so
+the panic never unwinds out of the `extern "C"` function, which would abort the app).
 **A negative return is not an error the caller has to handle**: passing the
 frame on untouched is always the right fallback.
 

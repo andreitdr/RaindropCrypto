@@ -170,7 +170,7 @@ impl<'a> I420FrameMut<'a> {
     pub fn row(&self, plane: Plane, y: usize) -> &[u8] {
         let (base, stride) = self.plane(plane);
         let width = self.plane_width(plane);
-        debug_assert!(y < self.plane_height(plane), "row out of range");
+        assert!(y < self.plane_height(plane), "row out of range");
 
         // SAFETY: `new` checked stride >= width and the caller guaranteed
         // stride * height bytes, and `y` is inside the plane's height.
@@ -180,7 +180,7 @@ impl<'a> I420FrameMut<'a> {
     pub fn row_mut(&mut self, plane: Plane, y: usize) -> &mut [u8] {
         let (base, stride) = self.plane(plane);
         let width = self.plane_width(plane);
-        debug_assert!(y < self.plane_height(plane), "row out of range");
+        assert!(y < self.plane_height(plane), "row out of range");
 
         // SAFETY: as `row`, and `&mut self` means no other borrow is live.
         unsafe { core::slice::from_raw_parts_mut(base.add(y * stride), width) }

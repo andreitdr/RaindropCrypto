@@ -12,7 +12,8 @@
 //! code that knows nothing about Rust.
 
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::panic::AssertUnwindSafe;
+use std::sync::{Mutex, MutexGuard, OnceLock, TryLockError};
 
 use raindrop_video::replace::Background;
 use raindrop_video::{Config, EffectKind, Effects};
@@ -61,6 +62,18 @@ pub struct VideoEffectsStats {
 fn registry() -> &'static Mutex<HashMap<u64, Effects>> {
     static REGISTRY: OnceLock<Mutex<HashMap<u64, Effects>>> = OnceLock::new();
     REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Locks the registry, taking it over if an earlier holder panicked.
+///
+/// A panic while the lock is held would otherwise poison it for good: every later call would fail
+/// and the effects would silently stop. The map is still usable after such a panic, so the lock is
+/// recovered and the poison flag cleared.
+fn lock_registry() -> MutexGuard<'static, HashMap<u64, Effects>> {
+    registry().lock().unwrap_or_else(|poisoned| {
+        registry().clear_poison();
+        poisoned.into_inner()
+    })
 }
 
 fn next_handle() -> u64 {
@@ -112,12 +125,12 @@ pub fn video_effects_create(config: VideoEffectsConfig) -> Result<u64, VideoFail
 
     let effects = Effects::new(config_of(&config)).map_err(other)?;
     let handle = next_handle();
-    registry().lock().map_err(poisoned)?.insert(handle, effects);
+    lock_registry().insert(handle, effects);
     Ok(handle)
 }
 
 pub fn video_effects_update(handle: u64, config: VideoEffectsConfig) -> Result<(), VideoFailure> {
-    let mut registry = registry().lock().map_err(poisoned)?;
+    let mut registry = lock_registry();
     let effects = registry.get_mut(&handle).ok_or_else(bad_handle)?;
     effects.set_config(config_of(&config)).map_err(other)
 }
@@ -132,13 +145,13 @@ pub fn video_effects_set_background_file(handle: u64, path: String) -> Result<()
         message: format!("{path} could not be read as a picture"),
     })?;
 
-    let mut registry = registry().lock().map_err(poisoned)?;
+    let mut registry = lock_registry();
     let effects = registry.get_mut(&handle).ok_or_else(bad_handle)?;
     effects.set_background(background).map_err(other)
 }
 
 pub fn video_effects_stats(handle: u64) -> Result<VideoEffectsStats, VideoFailure> {
-    let registry = registry().lock().map_err(poisoned)?;
+    let registry = lock_registry();
     let effects = registry.get(&handle).ok_or_else(bad_handle)?;
     let stats = effects.stats();
 
@@ -156,9 +169,7 @@ pub fn video_effects_stats(handle: u64) -> Result<VideoEffectsStats, VideoFailur
 /// handle going missing makes a late call a no-op rather than a crash, but a
 /// frame processed after this is a frame that was not.
 pub fn video_effects_destroy(handle: u64) {
-    if let Ok(mut registry) = registry().lock() {
-        registry.remove(&handle);
-    }
+    lock_registry().remove(&handle);
 }
 
 /// Runs one frame through the effects under `handle`.
@@ -168,15 +179,35 @@ pub(crate) fn process(handle: u64, frame: &mut raindrop_video::frame::I420FrameM
     // try_lock, never lock: the capture thread must not block behind a
     // configuration change, and a frame left alone for one tick is invisible
     // where a stalled camera is not.
-    let Ok(mut registry) = registry().try_lock() else {
-        return false;
+    let mut registry = match registry().try_lock() {
+        Ok(registry) => registry,
+        Err(TryLockError::Poisoned(poisoned)) => {
+            registry().clear_poison();
+            poisoned.into_inner()
+        }
+        Err(TryLockError::WouldBlock) => return false,
     };
 
+    process_in(&mut registry, handle, |effects| effects.process(frame).is_ok())
+}
+
+/// Runs `run` on the effects under `handle`, catching a panic inside it.
+///
+/// The catch happens here, while the registry is still locked and not unwinding, so a panic cannot
+/// poison the lock. The effects that panicked are dropped: their state is not trusted after an
+/// unwind, and dropping them stops their segmentation worker. The frame is left as it arrived.
+fn process_in(registry: &mut HashMap<u64, Effects>, handle: u64, run: impl FnOnce(&mut Effects) -> bool) -> bool {
     let Some(effects) = registry.get_mut(&handle) else {
         return false;
     };
 
-    effects.process(frame).is_ok()
+    match std::panic::catch_unwind(AssertUnwindSafe(|| run(effects))) {
+        Ok(processed) => processed,
+        Err(_) => {
+            registry.remove(&handle);
+            false
+        }
+    }
 }
 
 fn bad_handle() -> VideoFailure {
@@ -193,9 +224,58 @@ fn other(error: raindrop_video::Error) -> VideoFailure {
     }
 }
 
-fn poisoned<T>(_: T) -> VideoFailure {
-    VideoFailure {
-        kind: VideoFailureKind::Other,
-        message: "the camera effects are in an unusable state".into(),
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use raindrop_video::frame::I420FrameMut;
+
+    fn effects() -> Effects {
+        Effects::new(Config::default()).expect("default effects")
+    }
+
+    #[test]
+    fn a_panicking_effect_is_removed_and_the_frame_left_alone() {
+        let mut registry = HashMap::new();
+        registry.insert(7, effects());
+
+        assert!(!process_in(&mut registry, 7, |_| panic!("injected test panic")));
+        assert!(!registry.contains_key(&7));
+    }
+
+    #[test]
+    fn a_healthy_effect_keeps_its_result_and_its_entry() {
+        let mut registry = HashMap::new();
+        registry.insert(7, effects());
+
+        assert!(process_in(&mut registry, 7, |_| true));
+        assert!(!process_in(&mut registry, 7, |_| false));
+        assert!(registry.contains_key(&7));
+        assert!(!process_in(&mut registry, 8, |_| true));
+    }
+
+    #[test]
+    fn a_poisoned_registry_still_processes_destroys_and_stores() {
+        // Poison the registry the way a panic while the lock is held would.
+        let _ = std::panic::catch_unwind(|| {
+            let _held = registry().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            panic!("injected test panic");
+        });
+        assert!(registry().is_poisoned());
+
+        let handle = next_handle();
+        lock_registry().insert(handle, effects());
+        assert!(!registry().is_poisoned());
+
+        let (mut y, mut u, mut v) = (vec![0u8; 16 * 16], vec![0u8; 8 * 8], vec![0u8; 8 * 8]);
+        // SAFETY: each plane is a live buffer of at least stride * rows bytes, and nothing else touches them.
+        let Ok(mut frame) = (unsafe {
+            I420FrameMut::new(y.as_mut_ptr(), 16, u.as_mut_ptr(), 8, v.as_mut_ptr(), 8, 16, 16)
+        }) else {
+            panic!("the test frame should be valid");
+        };
+        assert!(process(handle, &mut frame));
+
+        video_effects_destroy(handle);
+        assert!(!lock_registry().contains_key(&handle));
     }
 }

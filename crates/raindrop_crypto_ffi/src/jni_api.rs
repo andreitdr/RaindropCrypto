@@ -27,7 +27,7 @@ const BAD_PLANE: jint = -4;
 
 /// The processor panicked. Reported rather than hidden behind a 0, which would
 /// claim the frame had been processed when it was in fact passed on untouched.
-const PANICKED: jint = -5;
+const PANICKED: jint = crate::c_api::PANICKED;
 
 /// Rewrites one I420 frame in place, with the planes a Java
 /// `VideoFrame.I420Buffer` hands over. Returns 0 when the frame was processed

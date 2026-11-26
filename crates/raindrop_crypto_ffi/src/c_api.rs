@@ -21,6 +21,11 @@
 
 use raindrop_video::frame::I420FrameMut;
 
+/// The processor panicked. Reported rather than hidden behind a 0, which would claim the frame had
+/// been processed when it was in fact passed on untouched. Shared with the JNI surface, which
+/// reports the same code.
+pub(crate) const PANICKED: i32 = -5;
+
 /// The signature the platform's capture pipeline calls.
 ///
 /// Named so the address handed to Dart goes through a typed pointer, and so the
@@ -88,9 +93,32 @@ pub unsafe extern "C" fn raindrop_video_process_i420(
         return -2;
     };
 
-    if crate::api::video::process(context as u64, &mut frame) {
-        0
-    } else {
-        -3
+    guarded(|| crate::api::video::process(context as u64, &mut frame))
+}
+
+/// Turns one frame's processing into the return code. A panic must not unwind out of an
+/// `extern "C"` function, which aborts the app, so it is caught here and reported as [`PANICKED`]:
+/// the frame is passed on untouched, costing one frame rather than the process.
+pub(crate) fn guarded(process: impl FnOnce() -> bool) -> i32 {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(process)) {
+        Ok(true) => 0,
+        Ok(false) => -3,
+        Err(_) => PANICKED,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_panicking_processor_is_reported_not_unwound() {
+        assert_eq!(guarded(|| panic!("injected test panic")), PANICKED);
+    }
+
+    #[test]
+    fn processed_and_untouched_frames_keep_their_codes() {
+        assert_eq!(guarded(|| true), 0);
+        assert_eq!(guarded(|| false), -3);
     }
 }
