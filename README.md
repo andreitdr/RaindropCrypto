@@ -44,7 +44,7 @@ flutter_rust_bridge_codegen generate
 ```
 
 The Flutter app builds this crate by itself through `RaindropClient/native/raindrop_crypto_builder`
-(cargokit). See `RaindropClient/docs/crypto.md`.
+(a Dart build hook, pinned by `crates/raindrop_crypto_ffi/rust-toolchain.toml`). See `RaindropClient/docs/crypto.md`.
 
 ## Notes
 

@@ -15,12 +15,12 @@ cancels a run still in progress. Both jobs use `dtolnay/rust-toolchain@stable` a
 
 `--locked` means `Cargo.lock` is authoritative: a dependency bump has to be committed, it cannot
 happen on the runner. `test` runs on `ubuntu-latest` only. Android and iOS are not built here — the
-client's CI compiles this workspace for both through cargokit, with the same lints. What the tests
+client's CI compiles this workspace for both through its build hook, with the same lints. What the tests
 cover is in [Testing & building](testing.md).
 
 **Warnings are errors.** `Cargo.toml`'s `[workspace.lints.rust]` sets `warnings = "deny"`, and every
 crate opts in with `[lints] workspace = true`, so a warning fails `cargo build` locally, on every CI
-platform, and inside the client's cargokit build (crates.io dependencies are exempt: cargo caps their
+platform, and inside the client's build hook (crates.io dependencies are exempt: cargo caps their
 lints). A failing `build` stops `release.yml`, so **no release is published while any platform has a
 compilation error or a warning**. Fix the warning; do not `#[allow]` it to get a build through unless
 the code is right and the lint is wrong, and then say why in a comment next to the `allow`.

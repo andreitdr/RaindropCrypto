@@ -14,7 +14,7 @@ RaindropCrypto is the end-to-end encryption core for Raindrop, a decentralised, 
 platform — **and, since camera video, the client's camera-effects core as well**
 ([`docs/video-effects.md`](docs/video-effects.md)). The effects have nothing to do with encryption;
 they live here because they are Rust that has to reach all five of the client's targets, which is
-exactly what this workspace's cargokit build already does, and because the Flutter media library
+exactly what this workspace's build hook already does, and because the Flutter media library
 exposes no way to touch a camera frame from Dart at all.
 
 It is shared by two other projects, and several of its byte formats are a contract with them:
@@ -66,8 +66,12 @@ never edit it by hand, and that includes `cargo fmt`: it reorders three `use` gr
 (edition 2024 sorts `transform_result_dco` differently), so `cargo fmt --all --check` always reports
 it. **Leave it as the codegen wrote it** and check that every other diff it reports is dealt with.
 
-The Flutter app builds `raindrop_crypto_ffi` by itself through `RaindropClient/native/
-raindrop_crypto_builder` (cargokit); there is no separate build step for the app. The first build takes
+The Flutter app builds `raindrop_crypto_ffi` by itself through the Dart build hook in
+`RaindropClient/native/raindrop_crypto_builder/hook/build.dart` (`flutter_rust_bridge_hooks`; cargokit is gone);
+there is no separate build step for the app. The hook needs the exact toolchain pinned in
+`crates/raindrop_crypto_ffi/rust-toolchain.toml` (channel 1.99.1 and every target the client ships):
+`rustup toolchain install` inside that folder installs it. Only builds started inside that folder see
+the pin; this workspace's own CI and `cargo` from the root still use stable. The first build takes
 a few minutes, mostly SQLCipher and OpenMLS. `[profile.dev.package."*"] opt-level = 2` keeps debug test
 runs quick, because the tests run real key derivations.
 
@@ -76,7 +80,7 @@ runs quick, because the tests run real key derivations.
 **A release cannot be published while any platform has a compilation error, and every warning is an
 error.** `Cargo.toml`'s `[workspace.lints.rust]` denies `warnings` for every crate (each has
 `[lints] workspace = true`; a new crate must too), so a warning fails `cargo build` here, in CI on
-Linux, macOS and Windows, and in the client's cargokit build for Android and iOS — and a failing CI
+Linux, macOS and Windows, and in the client's build hook for Android and iOS — and a failing CI
 stops `release.yml` before anything is published. When you see a warning, fix it in the same change;
 never ship around it with `#[allow(...)]` or by loosening the lint. An `allow` is only for a lint that is
 wrong about correct code, scoped to the item, with a comment saying why. Code behind
@@ -101,7 +105,7 @@ A Cargo workspace of three crates under `crates/`:
   to I420 camera frames **in place**, so there is no second track and the frame cryptor never notices.
   It depends on neither of the others and holds no key material. Its one `unsafe` is `frame.rs`, the
   borrowed-frame boundary; everything else is safe Rust over slices. Segmentation is behind the
-  `Segmenter` trait: MediaPipe's Selfie Segmentation as ONNX, run by `tract` (pure Rust, so cargokit
+  `Segmenter` trait: MediaPipe's Selfie Segmentation as ONNX, run by `tract` (pure Rust, so the build hook
   needs no toolchain of its own), with a deterministic fallback. The model **is** committed
   (`models/selfie_segmenter_v1.onnx`, Apache-2.0, ~440 KB, `include_bytes!`d when `build.rs` sees it),
   and `models/convert.py` rebuilds and re-verifies it from Google's published TensorFlow Lite file —

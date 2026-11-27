@@ -8,6 +8,9 @@ Homebrew's `rustup` is keg-only and not on the shell's `PATH` by default:
 export PATH=/opt/homebrew/opt/rustup/bin:$PATH
 ```
 
+This workspace builds with stable. The Flutter app's build hook uses the exact toolchain pinned in
+`crates/raindrop_crypto_ffi/rust-toolchain.toml`, which only builds started inside that folder see.
+
 From this folder (`RaindropCrypto/`):
 
 ```bash

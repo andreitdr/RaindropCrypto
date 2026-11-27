@@ -7,7 +7,7 @@ server can be shared across the isolate's calls (flutter_rust_bridge runs them o
 never edit it).
 
 It also carries the [camera effects](video-effects.md), which are not crypto and not a session: one
-Flutter plugin, one cargokit build and one library for both cores. Those have **three** surfaces rather
+build hook and one library for both cores. Those have **three** surfaces rather
 than one, because frames must not cross this bridge — `api/video.rs` over flutter_rust_bridge for
 control, `c_api.rs` as plain C for Apple's capture pipeline, and `jni_api.rs` for Android's. See
 [Camera effects → The three surfaces](video-effects.md#the-three-surfaces); the rest of this file is
@@ -84,8 +84,10 @@ Option<Vec<u8>>, presented_key: Option<Vec<u8>> }` is built with `From<CryptoErr
 ## Building and regenerating
 
 - **The Rust crate is compiled by the client**, not built standalone for the app: `RaindropClient/native/
-  raindrop_crypto_builder` (cargokit) compiles `raindrop_crypto_ffi` at `flutter build` / `flutter run`
-  time, on every platform the client targets. `cargo build -p raindrop_crypto_ffi` in this repo is only
+  raindrop_crypto_builder` (a Dart build hook, `flutter_rust_bridge_hooks`) compiles
+  `raindrop_crypto_ffi` during `flutter build` / `run` / `test`, on every platform the client targets,
+  and Flutter bundles the library it reports. The hook needs the toolchain pinned in
+  `crates/raindrop_crypto_ffi/rust-toolchain.toml`: run `rustup toolchain install` in that folder. `cargo build -p raindrop_crypto_ffi` in this repo is only
   for running the Dart bridge test directly (see [Testing & building](testing.md)).
 - **After changing anything under `src/api/`, regenerate the Dart bindings** from `RaindropClient/`
   (`flutter_rust_bridge.yaml` lives there and points `rust_root` back at this crate):

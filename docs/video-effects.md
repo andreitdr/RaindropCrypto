@@ -12,14 +12,14 @@ method channel has `captureFrame`, `getSources` and the frame cryptor, and
 nothing that hands over pixels. So the work has to happen in native code,
 reached from the capture pipeline.
 
-Writing it once in Rust, and letting the same cargokit build that already ships
+Writing it once in Rust, and letting the same build hook that already ships
 the encryption core carry it, means one segmentation implementation, one model
 and one set of tests instead of five. The per-platform native code is then only
 a shim that hands over pointers.
 
 This is a scope widening for a repo whose name says crypto. The alternative — a
 fourth top-level project — costs a second CI matrix and a second docs wiki and
-buys a tidier name; a second cargokit builder package is needed either way.
+buys a tidier name; a second builder package is needed either way.
 
 ## What crosses the boundary
 
@@ -42,7 +42,7 @@ That matters for three reasons:
 
 The effects are reached through `raindrop_crypto_ffi`, the same library the
 encryption core already ships (`Cargo.toml` depends on `raindrop_video`). A
-second library would have meant a second cargokit builder, a second codegen and
+second library would have meant a second build hook, a second codegen and
 a second `.so` to keep in step, for two crates that have to be in the app
 together anyway.
 
@@ -285,7 +285,7 @@ roughly 4× saving on the expensive part for a difference this radius hides.
 `segmentation::Segmenter` is the seam, for two reasons. The pixel work is most
 of the code and all of the per-frame cost, and none of it should know what
 produced the mask. And the runtime is the part most likely to be swapped: a
-pure-Rust engine is what makes one cargokit build work on all five targets,
+pure-Rust engine is what makes one build hook work on all five targets,
 while a platform-native or accelerated backend may later beat it on some of
 them — and measuring that is only possible if both sit behind the same call.
 
@@ -297,7 +297,7 @@ the background for a frame.
 Two implementations:
 
 **`onnx::OnnxSegmenter`** is the real one: an ONNX model run by `tract`. Pure
-Rust, which is the whole reason for that choice — the one cargokit build has to
+Rust, which is the whole reason for that choice — the one build hook has to
 produce this crate for five targets with no toolchain of its own, and a runtime
 with a C++ core (ONNX Runtime, TensorFlow Lite) would need linking solved
 separately on each. The input and output shapes are **fixed as named constants**
